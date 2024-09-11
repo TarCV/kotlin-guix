@@ -2,33 +2,38 @@ diff --git a/build.xml b/build.xml
 index cf640ec135ef..774e089201af 100644
 --- a/build.xml
 +++ b/build.xml
-@@ -16,7 +16,7 @@
+@@ -1,6 +1,8 @@
+ <project name="IntelliJ IDEA Community Edition" default="all">
+   <property name="project.home" value="${basedir}"/>
+   <property name="out.dir" value="${project.home}/out"/>
++  <property name="dist.dir" value="__STUB__"/>
++  <property name="ant-launcher.jar" value="__STUB__"/>
+   <property name="tmp.dir" value="${project.home}/out/tmp"/>
+ 
+   <target name="cleanup">
+@@ -16,8 +16,8 @@
+   <macrodef name="call_gant">
      <attribute name="script" />
      <sequential>
-       <java failonerror="true" jar="${project.home}/lib/ant/lib/ant-launcher.jar" fork="true">
+-      <java failonerror="true" jar="${project.home}/lib/ant/lib/ant-launcher.jar" fork="true">
++      <java failonerror="true" jar="${ant-launcher.jar}" fork="true">
 -        <jvmarg line="-Xmx612m -XX:MaxPermSize=152m"/>
 +        <jvmarg line="-Xmx4096M"/>
  
          <arg line="&quot;-Dgant.script=@{script}&quot;"/>
          <arg line="&quot;-Dteamcity.build.tempDir=${tmp.dir}&quot;"/>
-diff --git a/build/scripts/layouts.gant b/build/scripts/layouts.gant
-index 63b102725eee..07eda358ac8a 100644
---- a/build/scripts/layouts.gant
-+++ b/build/scripts/layouts.gant
-@@ -323,13 +323,6 @@ public def layoutCommunityPlugins(String home) {
-       fileset(dir: "$home/plugins/maven/maven-server-api/lib")
-     }
+@@ -36,4 +34,11 @@
+   </target>
  
--    layoutPlugin("gradle") {
--      jar("gradle.jar") {
--        module("gradle")
--      }
--      fileset(dir: "$home/plugins/gradle/lib") { include(name: "*.jar") }
--    }
--
-     layoutPlugin("git4idea") {
-       jar("git4idea-rt.jar") {
-         module("git4idea-rt")
+   <target name="all" depends="cleanup,build"/>
++  <target name="install" depends="build">
++    <copy todir="${dist.dir}">
++      <fileset dir="${out.dir}">
++        <include name="**/artifacts/core/intellij-core.jar" />
++      </fileset>
++    </copy>
++  </target>
+ </project>
 diff --git a/java/java-psi-impl/src/com/intellij/psi/impl/compiled/StubBuildingVisitor.java b/java/java-psi-impl/src/com/intellij/psi/impl/compiled/StubBuildingVisitor.java
 index d65a00d165de..56b7ab22ec95 100644
 --- a/java/java-psi-impl/src/com/intellij/psi/impl/compiled/StubBuildingVisitor.java
