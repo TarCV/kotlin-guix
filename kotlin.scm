@@ -85,37 +85,6 @@ builds using Ant, but using a programming language rather than XML to specify
 the rules.")
     (license license:asl2.0)))
 
-(define-public intellij-annotations-133
-  (package
-    (name "intellij-annotations")
-    (version "133")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (modules '((guix build utils)))
-        (snippet
-          '(begin
-            (delete-file-recursively "bin")
-            (delete-file-recursively "lib")
-            (delete-file-recursively "plugins")
-            (delete-file-recursively "python")
-            (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
-            #t))))
-    (build-system ant-build-system)
-    (arguments
-      `(#:jar-name "annotations.jar"
-        #:source-dir "platform/annotations/src"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "IntelliJ Platform: Annotations")
-    (description "IntelliJ Platform, annotations submodule")
-    (license license:asl2.0)))
-
 (define-public intellij-util-rt-133
   (package
     (name "intellij-util-rt")
@@ -139,7 +108,7 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list intellij-annotations-133))
+      (list java-jetbrains-annotations))
     (arguments
       `(#:jar-name "util-rt.jar"
         #:source-dir "platform/util-rt/src"
@@ -148,6 +117,89 @@ the rules.")
     (synopsis "IntelliJ Platform: Util-rt")
     (description "IntelliJ Platform, util-rt submodule")
     (license license:asl2.0)))
+
+(define-public intellij-deps-jsr166e-seqlock-133
+  (package
+    (name "intellij-deps-jsr166e-seqlock")
+    (version "133")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/intellij-community.git")
+              (commit version)))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./lib/src/jsr166e_src.jar"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+
+              (mkdir "src")
+              (copy-file "unzipped/jsr166e/extra/SequenceLock.java" "src/SequenceLock.java")
+              (delete-file-recursively "unzipped")
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list unzip))
+    (arguments
+      `(#:jar-name "jsr166e-seqlock.jar"
+        #:source-dir "src"
+        #:tests? #f))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "SequenceLock from the fork of jsr166e used in IntelliJ Platform")
+    (description "SequenceLock from the fork of jsr166e used in IntelliJ Platform")
+    (license license:cc0)))
+
+(define-public intellij-deps-picocontainer-133
+  (package
+    (name "intellij-deps-picocontainer")
+    (version "133")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/intellij-community.git")
+              (commit version)))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./lib/src/picocontainer-src.zip"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+              (copy-recursively "unzipped/picocontainer-1_2" ".")
+              (delete-file-recursively "unzipped")
+
+              (for-each delete-file
+                  (find-files "." ".*\\.(jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list unzip))
+    (arguments
+      `(#:jar-name "picocontainer.jar"
+        #:source-dir "container/src/java"
+        #:tests? #f))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "Fork of picocontainer used in IntelliJ Platform")
+    (description "Fork of picocontainer used in IntelliJ Platform")
+    (license license:bsd-3)))
 
 (define-public intellij-deps-trove4j-133
   (package
@@ -160,23 +212,25 @@ the rules.")
               (commit version)))
         (file-name (git-file-name name version))
         (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (modules '((guix build utils)))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
         (snippet
           #~(begin
               (invoke (string-append #$unzip "/bin/unzip")
                        "./lib/src/trove4j_src.jar"
                        "-d"
                        "unzipped")
-              (delete-file-recursively "build")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
               (for-each (lambda (f)
                           (delete-file-recursively f))
-                        (filter (lambda f (regexp-match? (string-match "^\\.|^unzipped$" f))) (scandir ".")))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
               (for-each delete-file
                   (find-files "." ".*\\.(jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
-     (list java-junit unzip))
+     (list unzip))
     (arguments
       `(#:jar-name "trove4j.jar"
         #:source-dir "unzipped/core/src"
@@ -190,8 +244,8 @@ the rules.")
 ;;           (add-before 'check 'fix-test-path
 ;;             (lambda _
 ;;               (substitute* "build.xml" (("\\$\\{test\\.home\\}/java") ""))
-;;             #t))))
-         )
+;;             #t))
+         )))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Fork of trove4j used in IntelliJ Platform")
     (description "Fork of trove4j used in IntelliJ Platform")
@@ -208,6 +262,7 @@ the rules.")
               (commit version)))
         (file-name (git-file-name name version))
         (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
           '(begin
@@ -217,15 +272,21 @@ the rules.")
             (delete-file-recursively "python")
             (for-each delete-file
                 (find-files "." ".*\\.(jar|so)$"))
+
+            ;; Delete Mac-only UI classes which are not needed for JPS
+            (delete-file "platform/util/src/com/intellij/util/AppleHiDPIScaledImage.java")
+            (delete-file "platform/util/src/com/intellij/util/ui/MacUIUtil.java")
+            (delete-file-recursively "platform/util/src/com/intellij/ui/mac")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list intellij-annotations-133))
+      (list java-jetbrains-annotations))
     (inputs
-     (list intellij-util-rt-133 java-log4j-api))
+     (list java-asm-3 java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform intellij-deps-jsr166e-seqlock-133 intellij-deps-picocontainer-133 intellij-util-rt-133 intellij-deps-trove4j-133))
     (arguments
       `(#:jar-name "util.jar"
         #:source-dir "platform/util/src"
+        #:jdk ,icedtea-8
         #:tests? #f))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util")
@@ -254,7 +315,7 @@ the rules.")
                 (find-files "." ".*\\.(jar|so)$"))
             #t))))
     (native-inputs
-     (list ant gant intellij-annotations-133 intellij-util-rt-133))
+     (list ant gant java-jetbrains-annotations intellij-util-rt-133 intellij-util-133 intellij-deps-trove4j-133))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "jps-builders.jar"
@@ -299,43 +360,44 @@ the rules.")
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains standalone builder only.")
     (license license:asl2.0)))
 
-(define-public intellij-sdk-133
-  (package
-    (name "intellij-sdk")
-    (version "133")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (patches '("patches/sdk-133.patch"))
-        (modules '((guix build utils)))
-        (snippet
-          '(begin
-            (delete-file-recursively "bin")
-            (delete-file-recursively "lib")
-            (delete-file-recursively "plugins")
-            (delete-file-recursively "python")
-            (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
-            (mkdir-p "lib")
-            #t))))
-    (native-inputs
-     (list ant gant))
-    (build-system ant-build-system)
-    (arguments
-      `(#:build-target "build"
-        #:tests? #f
-        #:make-flags
-        ,#~(list
-              (string-append "-Ddist.dir=" #$output "/share/java")
-              (string-append "-Dant-launcher.jar=" #$(this-package-native-input "ant") "/lib/ant-launcher.jar"))))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "IntelliJ Platform")
-    (description "IntelliJ Platform")
-    (license license:asl2.0)))
+;; JPS is probably enough for compiling Kotlin, no need to build the sdk platform
+;; (define-public intellij-sdk-133
+;;   (package
+;;     (name "intellij-sdk")
+;;     (version "133")
+;;     (source (origin
+;;         (method git-fetch)
+;;         (uri (git-reference
+;;               (url "https://github.com/JetBrains/intellij-community.git")
+;;               (commit version)))
+;;         (file-name (git-file-name name version))
+;;         (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+;;         (patches '("patches/sdk-133.patch"))
+;;         (modules '((guix build utils)))
+;;         (snippet
+;;           '(begin
+;;             (delete-file-recursively "bin")
+;;             (delete-file-recursively "lib")
+;;             (delete-file-recursively "plugins")
+;;             (delete-file-recursively "python")
+;;             (for-each delete-file
+;;                 (find-files "." ".*\\.(jar|so)$"))
+;;             (mkdir-p "lib")
+;;             #t))))
+;;     (native-inputs
+;;      (list ant gant))
+;;     (build-system ant-build-system)
+;;     (arguments
+;;       `(#:build-target "build"
+;;         #:tests? #f
+;;         #:make-flags
+;;         ,#~(list
+;;               (string-append "-Ddist.dir=" #$output "/share/java")
+;;               (string-append "-Dant-launcher.jar=" #$(this-package-native-input "ant") "/lib/ant-launcher.jar"))))
+;;     (home-page "https://www.jetbrains.com/opensource/idea/")
+;;     (synopsis "IntelliJ Platform")
+;;     (description "IntelliJ Platform")
+;;     (license license:asl2.0)))
 
 (define-public kotlin-0-6-786
   (package
@@ -353,7 +415,7 @@ the rules.")
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
     (native-inputs
-     (list intellij-sdk-133 java-jline-2 ant ant-contrib))
+     (list intellij-jps-standalone-builder-133 java-jline-2 ant ant-contrib))
     (build-system ant-build-system)
     (arguments
       `(#:build-target "dist"
@@ -374,4 +436,4 @@ the rules.")
 
 ;; This allows you to run guix shell -f guix-packager.scm.
 ;; Remove this line if you just want to define a package.
-intellij-deps-trove4j-133
+intellij-jps-builders-133
