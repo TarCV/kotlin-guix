@@ -386,3 +386,170 @@ index d65a00d165de..56b7ab22ec95 100644
 +        result.addContent((Content)o.clone());
        }
      } // end while
+--- a/java/compiler/javac2/src/com/intellij/ant/Javac2.java
++++ b/java/compiler/javac2/src/com/intellij/ant/Javac2.java
+@@ -18,9 +18,6 @@
+ import com.intellij.compiler.instrumentation.InstrumentationClassFinder;
+ import com.intellij.compiler.instrumentation.InstrumenterClassWriter;
+ import com.intellij.compiler.notNullVerification.NotNullVerifyingInstrumenter;
+-import com.intellij.uiDesigner.compiler.*;
+-import com.intellij.uiDesigner.lw.CompiledClassPropertiesProvider;
+-import com.intellij.uiDesigner.lw.LwRootContainer;
+ import org.apache.tools.ant.BuildException;
+ import org.apache.tools.ant.Project;
+ import org.apache.tools.ant.taskdefs.Javac;
+@@ -243,93 +240,7 @@
+    * @param finder a classloader to use
+    */
+   private void instrumentForms(final InstrumentationClassFinder finder) {
+     // we instrument every file, because we cannot find which files should not be instrumented without dependency storage
+     final ArrayList formsToInstrument = myFormFiles;
+
+     if (formsToInstrument.size() == 0) {
+       log("No forms to instrument found", Project.MSG_VERBOSE);
+       return;
+     }
++    fireError("Form instrumentation is not supported. Found forms: " + formsToInstrument);
+-
+-    final HashMap class2form = new HashMap();
+-
+-    for (int i = 0; i < formsToInstrument.size(); i++) {
+-      final File formFile = (File)formsToInstrument.get(i);
+-
+-      log("compiling form " + formFile.getAbsolutePath(), Project.MSG_VERBOSE);
+-      final LwRootContainer rootContainer;
+-      try {
+-        rootContainer = Utils.getRootContainer(formFile.toURI().toURL(), new CompiledClassPropertiesProvider(finder.getLoader()));
+-      }
+-      catch (AlienFormFileException e) {
+-        // ignore non-IDEA forms
+-        continue;
+-      }
+-      catch (Exception e) {
+-        fireError("Cannot process form file " + formFile.getAbsolutePath() + ". Reason: " + e);
+-        continue;
+-      }
+-
+-      final String classToBind = rootContainer.getClassToBind();
+-      if (classToBind == null) {
+-        continue;
+-      }
+-
+-      String name = classToBind.replace('.', '/');
+-      File classFile = getClassFile(name);
+-      if (classFile == null) {
+-        log(formFile.getAbsolutePath() + ": Class to bind does not exist: " + classToBind, Project.MSG_WARN);
+-        continue;
+-      }
+-
+-      final File alreadyProcessedForm = (File)class2form.get(classToBind);
+-      if (alreadyProcessedForm != null) {
+-        fireError(formFile.getAbsolutePath() +
+-                  ": " +
+-                  "The form is bound to the class " +
+-                  classToBind +
+-                  ".\n" +
+-                  "Another form " +
+-                  alreadyProcessedForm.getAbsolutePath() +
+-                  " is also bound to this class.");
+-        continue;
+-      }
+-      class2form.put(classToBind, formFile);
+-
+-      try {
+-        int version;
+-        InputStream stream = new FileInputStream(classFile);
+-        try {
+-          version = getClassFileVersion(new ClassReader(stream));
+-        }
+-        finally {
+-          stream.close();
+-        }
+-        AntNestedFormLoader formLoader = new AntNestedFormLoader(finder.getLoader(), myNestedFormPathList);
+-        InstrumenterClassWriter classWriter = new InstrumenterClassWriter(getAsmClassWriterFlags(version), finder);
+-        final AsmCodeGenerator codeGenerator = new AsmCodeGenerator(rootContainer, finder, formLoader, false, classWriter);
+-        codeGenerator.patchFile(classFile);
+-        final FormErrorInfo[] warnings = codeGenerator.getWarnings();
+-
+-        for (int j = 0; j < warnings.length; j++) {
+-          log(formFile.getAbsolutePath() + ": " + warnings[j].getErrorMessage(), Project.MSG_WARN);
+-        }
+-        final FormErrorInfo[] errors = codeGenerator.getErrors();
+-        if (errors.length > 0) {
+-          StringBuffer message = new StringBuffer();
+-          for (int j = 0; j < errors.length; j++) {
+-            if (message.length() > 0) {
+-              message.append("\n");
+-            }
+-            message.append(formFile.getAbsolutePath()).append(": ").append(errors[j].getErrorMessage());
+-          }
+-          fireError(message.toString());
+-        }
+-      }
+-      catch (Exception e) {
+-        fireError("Forms instrumentation failed for " + formFile.getAbsolutePath() + ": " + e.toString());
+-      }
+-    }
+   }
+
+   /**
+@@ -520,59 +431,4 @@
+     return new InstrumentationClassFinder(urlsArr);
+   }
+
+-  private class AntNestedFormLoader implements NestedFormLoader {
+-    private final ClassLoader myLoader;
+-    private final List myNestedFormPathList;
+-    private final HashMap myFormCache = new HashMap();
+-
+-    public AntNestedFormLoader(final ClassLoader loader, List nestedFormPathList) {
+-      myLoader = loader;
+-      myNestedFormPathList = nestedFormPathList;
+-    }
+-
+-    public LwRootContainer loadForm(String formFilePath) throws Exception {
+-      if (myFormCache.containsKey(formFilePath)) {
+-        return (LwRootContainer)myFormCache.get(formFilePath);
+-      }
+-
+-      String lowerFormFilePath = formFilePath.toLowerCase();
+-      log("Searching for form " + lowerFormFilePath, Project.MSG_VERBOSE);
+-      for (Iterator iterator = myFormFiles.iterator(); iterator.hasNext();) {
+-        File file = (File)iterator.next();
+-        String name = file.getAbsolutePath().replace(File.separatorChar, '/').toLowerCase();
+-        log("Comparing with " + name, Project.MSG_VERBOSE);
+-        if (name.endsWith(lowerFormFilePath)) {
+-          return loadForm(formFilePath, new FileInputStream(file));
+-        }
+-      }
+-
+-      if (myNestedFormPathList != null) {
+-        for (int i = 0; i < myNestedFormPathList.size(); i++) {
+-          PrefixedPath path = (PrefixedPath)myNestedFormPathList.get(i);
+-          File formFile = path.findFile(formFilePath);
+-          if (formFile != null) {
+-            return loadForm(formFilePath, new FileInputStream(formFile));
+-          }
+-        }
+-      }
+-      InputStream resourceStream = myLoader.getResourceAsStream(formFilePath);
+-      if (resourceStream != null) {
+-        return loadForm(formFilePath, resourceStream);
+-      }
+-      throw new Exception("Cannot find nested form file " + formFilePath);
+-    }
+-
+-    private LwRootContainer loadForm(String formFileName, InputStream resourceStream) throws Exception {
+-      final LwRootContainer container = Utils.getRootContainer(resourceStream, null);
+-      myFormCache.put(formFileName, container);
+-      return container;
+-    }
+-
+-    public String getClassToBindName(LwRootContainer container) {
+-      final String className = container.getClassToBind();
+-      String result = getClassOrInnerName(className.replace('.', '/'));
+-      if (result != null) return result.replace('/', '.');
+-      return className;
+-    }
+-  }
+ }
