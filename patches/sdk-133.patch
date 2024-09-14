@@ -398,18 +398,10 @@ index d65a00d165de..56b7ab22ec95 100644
  import org.apache.tools.ant.BuildException;
  import org.apache.tools.ant.Project;
  import org.apache.tools.ant.taskdefs.Javac;
-@@ -243,93 +240,7 @@
-    * @param finder a classloader to use
-    */
-   private void instrumentForms(final InstrumentationClassFinder finder) {
-     // we instrument every file, because we cannot find which files should not be instrumented without dependency storage
-     final ArrayList formsToInstrument = myFormFiles;
-
-     if (formsToInstrument.size() == 0) {
+@@ -240,86 +237,7 @@
        log("No forms to instrument found", Project.MSG_VERBOSE);
        return;
      }
-+    fireError("Form instrumentation is not supported. Found forms: " + formsToInstrument);
 -
 -    final HashMap class2form = new HashMap();
 -
@@ -490,6 +482,7 @@ index d65a00d165de..56b7ab22ec95 100644
 -        fireError("Forms instrumentation failed for " + formFile.getAbsolutePath() + ": " + e.toString());
 -      }
 -    }
++    fireError("Form instrumentation is not supported. Found forms: " + formsToInstrument);
    }
 
    /**
@@ -553,3 +546,33 @@ index d65a00d165de..56b7ab22ec95 100644
 -    }
 -  }
  }
+--- a/platform/extensions/src/com/intellij/openapi/extensions/impl/ExtensionsAreaImpl.java
++++ b/platform/extensions/src/com/intellij/openapi/extensions/impl/ExtensionsAreaImpl.java
+@@ -168,8 +168,8 @@
+     // has content
+     if (!extensionElement.getContent().isEmpty()) return true;
+     // has custom attributes
+-    for (Attribute attribute : extensionElement.getAttributes()) {
++    for (Object attribute : extensionElement.getAttributes()) {
+-      final String name = attribute.getName();
++      final String name = ((Attribute)attribute).getName();
+       if (!"implementation".equals(name) && !"id".equals(name) && !"order".equals(name)) {
+         return true;
+       }
+--- a/platform/core-api/src/com/intellij/patterns/ObjectPattern.java
++++ b/platform/core-api/src/com/intellij/patterns/ObjectPattern.java
+@@ -58,12 +58,12 @@
+   }
+
+   public Self andNot(final ElementPattern pattern) {
+-    return and(StandardPatterns.not(pattern));
++    return (Self) and(StandardPatterns.not(pattern));
+   }
+
+   public Self andOr(final ElementPattern... patterns) {
+-    return and(StandardPatterns.or(patterns));
++    return (Self) and(StandardPatterns.or(patterns));
+   }
+
+   public Self and(final ElementPattern pattern) {
+

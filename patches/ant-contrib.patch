@@ -8,7 +8,21 @@
  	
  	<property name="root.dir" location="." />
  	<property name="src.dir" location="src" />
-@@ -190,7 +190,13 @@
+@@ -53,12 +54,11 @@
+ 		<ivy:cachefileset setid="test.fileset" type="jar" conf="test" />
+ 	</target>
+ 		
+-	<target name="compile" depends="classpath">
++	<target name="compile">
+ 		<mkdir dir="${target.classes.dir}" />
+ 		<javac srcdir="${src.java.dir}"
+ 		       destdir="${target.classes.dir}"
+ 		       debug="true"
+-		       classpathref="compile.classpath"
+ 		       source="${jdk.source}"
+ 		       target="${jdk.target}"
+ 		  />
+@@ -190,7 +191,13 @@
  			<fileset dir="${docs.dir}" includes="**/*" />
  		</copy>
      </target>
@@ -23,14 +37,3 @@
  	<target name="dist-stage" depends="jar,docs">
  		<mkdir dir="${target.stage.dir}" />
  		<mkdir dir="${target.stage.dir}/lib" />
---- a/src/main/java/net/sf/antcontrib/net/URLImportTask.java
-+++ b/src/main/java/net/sf/antcontrib/net/URLImportTask.java
-@@ -158,7 +158,7 @@
- 			adapter = new Ivy20Adapter();
- 		}
- 		catch (ClassNotFoundException e) {
--			adapter = new Ivy14Adapter();
-+			throw new RuntimeException("Ivy is not loaded", e);
- 		}
- 		
- 		String setId = org + "." + module + "." + rev + ".fileset";
