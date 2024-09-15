@@ -11,8 +11,8 @@
   #:use-module (gnu packages java)
   #:use-module (gnu packages protobuf))
 
+;; TODO: replace vendored source with downloaded sources
 ;; TODO: enable tests where possible
-;; TODO: removed vendored source with downloaded sources
 
 (define-public ant-contrib
   (package
@@ -74,6 +74,30 @@
     (description "This Java package contains a DFA/NFA (finite-state automata) implementation with Unicode alphabet (UTF16) and support for the standard regular expression operations (concatenation, union, Kleene star) and a number of non-standard ones (intersection, complement, etc.). In contrast to many other automaton/regexp packages, this package is fast, compact, and implements real, unrestricted regular operations. It uses a symbolic representation based on intervals of Unicode characters.")
     (license license:bsd-3)))
 
+(define-public java-cli-parser
+  (package
+    (name "java-cli-parser")
+    (version "1.1.6")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/spullara/cli-parser.git")
+              (commit (string-append "cli-parser-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1f29v4jcnp5nfhhj3kzlryyp0yf97iizbfk1fi8jbhvcpxdajg1w"))))
+    (native-inputs
+     (list java-junit))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "cli-parser.jar"
+        #:source-dir "src/main/java"
+        #:test-dir "src/test"))
+    (home-page "https://github.com/spullara/cli-parser")
+    (synopsis "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists.")
+    (description "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists. Using annotations on your fields or JavaBean properties you can specify what configuration is available.")
+    (license license:asl2.0)))
+
 (define-public gant
   (package
     (name "gant")
@@ -123,19 +147,34 @@ builds using Ant, but using a programming language rather than XML to specify
 the rules.")
     (license license:asl2.0)))
 
-(define-public java-protobuf-api-2
+(define protobuf-2.5
+  (package
+    (inherit protobuf-2)
+    (version "2.5.0")
+      (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/google/protobuf/releases/"
+                            "download/v" version "/protobuf-"
+                            version ".tar.bz2"))
+        (sha256
+          (base32
+          "0xxn9gxhvsgzz2sgmihzf6pf75clr05mqj6218camwrwajpcbgqk"))))))
+
+(define java-protobuf-api-2.5
   (package
     (name "java-protobuf-api")
-    (version "2.6.1")
+    (version "2.5.0")
     (source
       (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/protocolbuffers/protobuf.git")
-              (commit (string-append "v" version))))
-        (sha256 (base32 "03df8zvx2sry3jz2x4pi3l32qyfqa7w8kj8jdbz30nzy0h7aa070"))))
+        (method url-fetch)
+        (uri (string-append "https://github.com/google/protobuf/releases/"
+                            "download/v" version "/protobuf-"
+                            version ".tar.bz2"))
+        (sha256
+          (base32
+          "0xxn9gxhvsgzz2sgmihzf6pf75clr05mqj6218camwrwajpcbgqk"))))
     (native-inputs
-     (list protobuf-2))
+     (list protobuf-2.5))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "protobuf.jar"
@@ -144,8 +183,8 @@ the rules.")
         #:phases
         ,#~(modify-phases %standard-phases
           (add-before 'build 'generate-sources
-            (lambda _
-              (invoke (string-append #$protobuf-2 "/bin/protoc")
+            (lambda* (#:key inputs #:allow-other-keys)
+              (invoke (string-append (assoc-ref inputs "protobuf") "/bin/protoc")
                        "--java_out=java/src/main/java"
                        "--proto_path=src"
                        "src/google/protobuf/descriptor.proto")
@@ -154,6 +193,21 @@ the rules.")
     (synopsis "Protocol Buffers are language-neutral, platform-neutral extensible mechanisms for serializing structured data. This package contains Java API.")
     (description "Protocol buffers are Google’s language-neutral, platform-neutral, extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. You define how you want your data to be structured once, then you can use special generated source code to easily write and read your structured data to and from a variety of data streams and using a variety of languages. This package contains Java API.")
     (license license:bsd-3)))
+
+;; Latest versions not depending on Java 8 Predicate
+(define java-guava-20
+  (package
+    (inherit java-guava)
+    (version "20.0")
+    (source (origin
+              (method git-fetch)
+              (uri (git-reference
+                     (url "https://github.com/google/guava/")
+                     (commit (string-append "v" version))))
+              (file-name (git-file-name "java-guava" version))
+              (sha256
+               (base32
+                "00h5cawdjic1vind3yivzh1f58flvm1yfmhsyqwyvmbvj1vakysp"))))))
 
 (define-public intellij-util-rt-133
   (package
@@ -295,7 +349,7 @@ the rules.")
 ;;               #t))))
 ;;     (build-system ant-build-system)
 ;;     (native-inputs
-;;       (list java-protobuf-api-2 unzip))
+;;       (list java-protobuf-api-2.5 unzip))
 ;;     (arguments
 ;;       `(#:jar-name "jzlib.jar"
 ;;         #:source-dir "unzipped/jzlib-1.1.1/src/main/java"
@@ -354,7 +408,7 @@ the rules.")
               #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-commons-logging-minimal java-log4j-1.2-api java-protobuf-api-2 java-slf4j-api unzip))
+      (list java-commons-logging-minimal java-log4j-1.2-api java-protobuf-api-2.5 java-slf4j-api unzip))
     (arguments
       `(#:jar-name "netty-all.jar"
         #:source-dir "unzipped"
@@ -734,6 +788,40 @@ the rules.")
     (description "IntelliJ Java psi-api submodule")
     (license license:asl2.0)))
 
+(define-public intellij-java-psi-impl-133
+  (package
+    (name "intellij-java-psi-impl")
+    (version "133")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/intellij-community.git")
+              (commit version)))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (patches '("patches/sdk-133.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jdom java-jetbrains-annotations intellij-asm4-133 intellij-core-api-133 intellij-core-impl-133 intellij-extensions-133 intellij-java-psi-api-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+    (arguments
+      `(#:jar-name "intellij-java-psi-impl.jar"
+        #:source-dir "java/java-psi-impl/src"
+        #:tests? #f))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Java PSI implementation")
+    (description "IntelliJ Java psi-impl submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-jps-model-api-133
   (package
     (name "intellij-jps-model-api")
@@ -789,7 +877,7 @@ the rules.")
                 (find-files "." ".*\\.(jar|so)$"))
             #t))))
     (native-inputs
-     (list ant gant java-jetbrains-annotations java-log4j-1.2-api intellij-jps-model-api-133 intellij-util-rt-133 intellij-util-133 intellij-asm4-133 intellij-jsr166e-seqlock-133 intellij-netty-133 intellij-trove4j-133 java-protobuf-api-2 ))
+     (list ant gant java-jetbrains-annotations java-log4j-1.2-api intellij-jps-model-api-133 intellij-util-rt-133 intellij-util-133 intellij-asm4-133 intellij-jsr166e-seqlock-133 intellij-netty-133 intellij-trove4j-133 java-protobuf-api-2.5 ))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-jps-builders.jar"
@@ -873,6 +961,46 @@ the rules.")
 ;;     (description "IntelliJ Platform")
 ;;     (license license:asl2.0)))
 
+(define-public kotlin-dart-ast
+  (package
+    (name "kotlin-dart-ast")
+    (version "0.6.786")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0igjrppp9nd7jb10ydx65xjml96ll9pbbvn8zvidzlbpgyz1mqqi"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./js/js.translator/lib/src/dart-ast-src.jar"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+
+              (for-each delete-file
+                  (find-files "." ".*\\.(jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations intellij-trove4j-133 intellij-util-133 intellij-util-rt-133 unzip))
+    (arguments
+      `(#:jar-name "dart-ast.jar"
+        #:source-dir "unzipped"
+        #:tests? #f))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "Vendored version dart-ast from the Kotlin source code")
+    (description "Vendored version dart-ast from the Kotlin source code")
+    (license license:bsd-3)))
+
 (define-public kotlin-0-6-786
   (package
     (name "kotlin")
@@ -889,7 +1017,7 @@ the rules.")
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
     (native-inputs
-     (list ant ant-contrib java-jline-2 java-guava java-javax-inject java-jetbrains-annotations java-protobuf-api-2 intellij-asm4-133 intellij-compiler-javac2-133 intellij-compiler-instrumentation-133 intellij-core-api-133 intellij-core-impl-133 intellij-java-psi-api-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+     (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations java-protobuf-api-2.5 intellij-asm4-133 intellij-compiler-javac2-133 intellij-compiler-instrumentation-133 intellij-core-api-133 intellij-core-impl-133 intellij-extensions-133 intellij-java-psi-api-133 intellij-java-psi-impl-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133 kotlin-dart-ast))
     (build-system ant-build-system)
     (arguments
       `(#:build-target "dist"
@@ -898,13 +1026,32 @@ the rules.")
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
              "-Didea.sdk=ideasdk"
-             (string-append "-Dbuild.number=" #$version))
+             (string-append "-Dbuild.number=" #$version)
+             "-verbose")
         #:tests? #f
         #:phases
           (modify-phases %standard-phases
+;;             (add-before 'build 'patch-predicates-for-java8-bootstrap
+;;               (lambda _
+;;                 (substitute* (find-files "." "\\.java$")
+;;                   (("new Predicate<([^>]+|[^>]+<[^>]+>)>\\(\\) \\{" all tparam) (string-append all " @Override public boolean test(" tparam " p) { return apply(p); } "))
+;;                   (("implements Predicate<([^>]+)> \\{" all tparam) (string-append all " @Override public boolean test(" tparam " p) { return apply(p); } "))
+;;                   (("new DescriptorPredicate\\(\\) \\{" all) (string-append all " @Override public boolean test(org.jetbrains.jet.lang.descriptors.FunctionDescriptor p) { return apply(p); } "))
+;;                   (("implements DescriptorPredicate\\ \\{" all) (string-append all " @Override public boolean test(org.jetbrains.jet.lang.descriptors.FunctionDescriptor p) { return apply(p); } ")))))
             (add-before 'build 'prepare-sdk-dir
               (lambda* (#:key inputs #:allow-other-keys)
+                ;; build.xml expects exact file names in dependencies directory
                 (mkdir-p "dependencies")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-jline")
+                    "/share/java/jline.jar")
+                  "dependencies/jline.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-cli-parser")
+                    "/share/java/cli-parser.jar")
+                  "dependencies/cli-parser-1.1.1.jar")
 
                 (mkdir-p "ideasdk/core")
                 (for-each
@@ -918,17 +1065,27 @@ the rules.")
                         (assoc-ref inputs p)
                         "\\.jar$")))
                   (list
+                    "java-cli-parser"
                     "java-guava"
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "intellij-asm4"
                     "intellij-core-api"
                     "intellij-core-impl"
+                    "intellij-extensions"
                     "intellij-java-psi-api"
+                    "intellij-java-psi-impl"
                     "intellij-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
+
+                (mkdir-p "js/js.translator/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "kotlin-dart-ast")
+                    "/share/java/dart-ast.jar")
+                  "js/js.translator/lib/dart-ast.jar")
 
                 ;; build.xml expects exact file names in ideasdk/lib
                 (mkdir-p "ideasdk/lib")

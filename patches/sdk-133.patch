@@ -486,6 +486,16 @@ index d65a00d165de..56b7ab22ec95 100644
    }
 
    /**
+@@ -448,9 +359,6 @@
+         catch (IOException e) {
+           log("Failed to instrument @NotNull assertion for " + path + ": " + e.getMessage(), Project.MSG_WARN);
+         }
+-        catch (Exception e) {
+-          fireError("@NotNull instrumentation failed for " + path + ": " + e.toString());
+-        }
+       }
+       else if (file.isDirectory()) {
+         instrumented += instrumentNotNull(file, finder);
 @@ -520,59 +431,4 @@
      return new InstrumentationClassFinder(urlsArr);
    }
