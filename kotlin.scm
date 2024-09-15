@@ -13,6 +13,7 @@
 
 ;; TODO: replace vendored source with downloaded sources
 ;; TODO: enable tests where possible
+;; TODO: verify quasiquotes and other magic characters
 
 (define-public ant-contrib
   (package
@@ -92,7 +93,8 @@
     (arguments
       `(#:jar-name "cli-parser.jar"
         #:source-dir "src/main/java"
-        #:test-dir "src/test"))
+        #:test-dir "src/test"
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://github.com/spullara/cli-parser")
     (synopsis "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists.")
     (description "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists. Using annotations on your fields or JavaBean properties you can specify what configuration is available.")
@@ -180,6 +182,7 @@ the rules.")
       `(#:jar-name "protobuf.jar"
         #:source-dir "java/src/main"
         #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
         ,#~(modify-phases %standard-phases
           (add-before 'build 'generate-sources
@@ -194,7 +197,14 @@ the rules.")
     (description "Protocol buffers are Google’s language-neutral, platform-neutral, extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. You define how you want your data to be structured once, then you can use special generated source code to easily write and read your structured data to and from a variety of data streams and using a variety of languages. This package contains Java API.")
     (license license:bsd-3)))
 
-;; Latest versions not depending on Java 8 Predicate
+(define java-jetbrains-annotations-java8
+  (package
+    (inherit java-jetbrains-annotations)
+    (arguments
+      `(#:make-flags (list "-Dant.build.javac.target=1.7")
+      ,@(package-arguments java-jetbrains-annotations)))))
+
+;; Latest version not depending on Java 8 Predicate
 (define java-guava-20
   (package
     (inherit java-guava)
@@ -207,7 +217,18 @@ the rules.")
               (file-name (git-file-name "java-guava" version))
               (sha256
                (base32
-                "00h5cawdjic1vind3yivzh1f58flvm1yfmhsyqwyvmbvj1vakysp"))))))
+                "00h5cawdjic1vind3yivzh1f58flvm1yfmhsyqwyvmbvj1vakysp"))))
+    (arguments
+      `(#:make-flags (list "-Dant.build.javac.target=1.7")
+      ,@(substitute-keyword-arguments (package-arguments java-guava)
+        ((#:phases phases)
+         `(modify-phases ,phases
+            (add-before 'build 'remove-ijrer-imports
+              (lambda _
+                (substitute*
+                  (find-files "." "\\.java$")
+                  (("import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;") ""))))
+            (delete 'install-listenablefuture-stub))))))))
 
 (define-public intellij-util-rt-133
   (package
@@ -236,7 +257,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-util-rt.jar"
         #:source-dir "platform/util-rt/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util-rt")
     (description "IntelliJ Platform, util-rt submodule")
@@ -275,7 +297,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-asm4.jar"
         #:source-dir "unzipped"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Vendored version of ASM 4 used in IntelliJ Platform")
     (description "Vendored version of ASM 4 used in IntelliJ Platform")
@@ -454,7 +477,8 @@ the rules.")
     (arguments
       `(#:jar-name "picocontainer.jar"
         #:source-dir "container/src/java"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Vendored version of picocontainer used in IntelliJ Platform")
     (description "Vendored version of picocontainer used in IntelliJ Platform")
@@ -494,6 +518,7 @@ the rules.")
       `(#:jar-name "trove4j.jar"
         #:source-dir "unzipped/core/src"
         #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
         (modify-phases %standard-phases
           (add-before 'build 'copy-generated-source
@@ -572,7 +597,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-compiler-javac2.jar"
         #:source-dir "java/compiler/javac2/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: compiler javac2 module.")
     (description "IntelliJ Platform: compiler javac2 module.")
@@ -589,6 +615,7 @@ the rules.")
               (commit version)))
         (file-name (git-file-name name version))
         (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
           '(begin
@@ -639,7 +666,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-core-api.jar"
         #:source-dir "platform/core-api/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Core API")
     (description "IntelliJ Platform, core-api submodule")
@@ -673,7 +701,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-core-impl.jar"
         #:source-dir "platform/core-impl/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Core implementation")
     (description "IntelliJ Platform, core-impl submodule")
@@ -707,7 +736,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-extensions.jar"
         #:source-dir "platform/extensions/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Extensions API")
     (description "IntelliJ Platform, extensions submodule")
@@ -748,7 +778,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-util.jar"
         #:source-dir "platform/util/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util")
     (description "IntelliJ Platform, util submodule")
@@ -782,7 +813,14 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-java-psi-api.jar"
         #:source-dir "java/java-psi-api/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'copy-messages
+            (lambda _
+              (mkdir-p "build/classes/messages")
+              (copy-recursively "java/java-psi-api/src/messages" "build/classes/messages"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Java PSI API")
     (description "IntelliJ Java psi-api submodule")
@@ -816,7 +854,8 @@ the rules.")
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Java PSI implementation")
     (description "IntelliJ Java psi-impl submodule")
@@ -995,7 +1034,8 @@ the rules.")
     (arguments
       `(#:jar-name "dart-ast.jar"
         #:source-dir "unzipped"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Vendored version dart-ast from the Kotlin source code")
     (description "Vendored version dart-ast from the Kotlin source code")
@@ -1016,8 +1056,8 @@ the rules.")
         (modules '((guix build utils)))
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
-    (native-inputs
-     (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations java-protobuf-api-2.5 intellij-asm4-133 intellij-compiler-javac2-133 intellij-compiler-instrumentation-133 intellij-core-api-133 intellij-core-impl-133 intellij-extensions-133 intellij-java-psi-api-133 intellij-java-psi-impl-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133 kotlin-dart-ast))
+    (native-inputs ;; TODO: Remove icedtea-7 from native-inputs
+     (list ant ant-contrib java-cli-parser java-jdom java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java8 java-protobuf-api-2.5 intellij-asm4-133 intellij-compiler-javac2-133 intellij-compiler-instrumentation-133 intellij-core-api-133 intellij-core-impl-133 intellij-extensions-133 intellij-java-psi-api-133 intellij-java-psi-impl-133 intellij-picocontainer-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133 kotlin-dart-ast icedtea-7))
     (build-system ant-build-system)
     (arguments
       `(#:build-target "dist"
@@ -1025,23 +1065,30 @@ the rules.")
         ,#~(list (string-append "-Doutput=" #$output)
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
-             "-Didea.sdk=ideasdk"
              (string-append "-Dbuild.number=" #$version)
-             "-verbose")
+             "-verbose"
+
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+             "-Djava.target=1.7")
         #:tests? #f
         #:phases
           (modify-phases %standard-phases
-;;             (add-before 'build 'patch-predicates-for-java8-bootstrap
-;;               (lambda _
-;;                 (substitute* (find-files "." "\\.java$")
-;;                   (("new Predicate<([^>]+|[^>]+<[^>]+>)>\\(\\) \\{" all tparam) (string-append all " @Override public boolean test(" tparam " p) { return apply(p); } "))
-;;                   (("implements Predicate<([^>]+)> \\{" all tparam) (string-append all " @Override public boolean test(" tparam " p) { return apply(p); } "))
-;;                   (("new DescriptorPredicate\\(\\) \\{" all) (string-append all " @Override public boolean test(org.jetbrains.jet.lang.descriptors.FunctionDescriptor p) { return apply(p); } "))
-;;                   (("implements DescriptorPredicate\\ \\{" all) (string-append all " @Override public boolean test(org.jetbrains.jet.lang.descriptors.FunctionDescriptor p) { return apply(p); } ")))))
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+            (add-before 'build 'add-bootclasspath
+              (lambda* (#:key inputs #:allow-other-keys)
+                (substitute* "build.xml"
+                  (("<javac2 " all) (string-append all "bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
+                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+
             (add-before 'build 'prepare-sdk-dir
               (lambda* (#:key inputs #:allow-other-keys)
                 ;; build.xml expects exact file names in dependencies directory
                 (mkdir-p "dependencies")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "ant")
+                    "/lib/ant.jar")
+                  "dependencies/ant.jar")
                 (symlink
                   (string-append
                     (assoc-ref inputs "java-jline")
@@ -1053,19 +1100,20 @@ the rules.")
                     "/share/java/cli-parser.jar")
                   "dependencies/cli-parser-1.1.1.jar")
 
-                (mkdir-p "ideasdk/core")
+                (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
                     (for-each
                       (lambda (f)
                         (symlink
                           f
-                          (string-append "ideasdk/core/" (basename f))))
+                          (string-append "ideaSDK/core/" (basename f))))
                       (find-files
                         (assoc-ref inputs p)
                         "\\.jar$")))
                   (list
                     "java-cli-parser"
+                    "java-jdom"
                     "java-guava"
                     "java-javax-inject"
                     "java-jetbrains-annotations"
@@ -1075,6 +1123,7 @@ the rules.")
                     "intellij-extensions"
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
+                    "intellij-picocontainer"
                     "intellij-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
@@ -1087,23 +1136,23 @@ the rules.")
                     "/share/java/dart-ast.jar")
                   "js/js.translator/lib/dart-ast.jar")
 
-                ;; build.xml expects exact file names in ideasdk/lib
-                (mkdir-p "ideasdk/lib")
+                ;; build.xml expects exact file names in ideaSDK/lib
+                (mkdir-p "ideaSDK/lib")
                 (symlink
                   (string-append
                     (assoc-ref inputs "intellij-compiler-javac2")
                     "/share/java/javac2.jar")
-                  "ideasdk/lib/javac2.jar")
+                  "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
                     (assoc-ref inputs "intellij-asm4")
                     "/share/java/asm4.jar")
-                  "ideasdk/lib/jetbrains-asm-debug-all-4.0.jar")
+                  "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
                   (string-append
                     (assoc-ref inputs "java-protobuf-api")
                     "/share/java/protobuf.jar")
-                  "ideasdk/lib/protobuf-2.5.0.jar")
+                  "ideaSDK/lib/protobuf-2.5.0.jar")
                 #t))
 
             (delete 'install))))

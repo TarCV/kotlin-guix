@@ -571,7 +571,7 @@ index d65a00d165de..56b7ab22ec95 100644
        }
 --- a/platform/core-api/src/com/intellij/patterns/ObjectPattern.java
 +++ b/platform/core-api/src/com/intellij/patterns/ObjectPattern.java
-@@ -58,12 +58,12 @@
+@@ -58,11 +58,11 @@
    }
 
    public Self andNot(final ElementPattern pattern) {
@@ -585,4 +585,14 @@ index d65a00d165de..56b7ab22ec95 100644
    }
 
    public Self and(final ElementPattern pattern) {
-
+--- a/java/compiler/instrumentation-util/src/com/intellij/compiler/instrumentation/InstrumentationClassFinder.java
++++ b/java/compiler/instrumentation-util/src/com/intellij/compiler/instrumentation/InstrumentationClassFinder.java
+@@ -120,7 +120,7 @@
+       final PseudoClass result = loadPseudoClass(is);
+       myLoaded.put(internalName, result);
+       return result;
+-    }
++    } catch (Throwable t) { throw new RuntimeException("Exception in loadClass(\"" + internalName + "\")", t); }
+     finally {
+       is.close();
+     }
