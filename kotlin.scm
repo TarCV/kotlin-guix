@@ -5,7 +5,6 @@
   #:use-module (guix build-system ant)
   #:use-module (guix git-download)
   #:use-module (gnu packages compression)
-  #:use-module (gnu packages groovy)
   #:use-module (gnu packages java-compression)
   #:use-module (gnu packages java-xml)
   #:use-module (gnu packages java)
@@ -33,7 +32,7 @@
                 (find-files "." ".*\\.(jar|so)$"))
             #t))))
     (native-inputs
-      (list java-apache-ivy java-commons-bcel java-commons-httpclient java-xerces unzip))
+      (list java-commons-bcel java-commons-httpclient java-xerces))
     (build-system ant-build-system)
     (arguments
       `(#:make-flags
@@ -63,8 +62,6 @@
               (commit "75db9df045892a4c59b8994f51e5cbc60be7fdc9")))
         (file-name (git-file-name name version))
         (sha256 (base32 "0a2xndhhb6al26kn77q1i2g9a81pzcybzdckz4818wb3s46p8ayv"))))
-    (native-inputs
-      (list java-apache-ivy java-commons-bcel java-commons-httpclient java-xerces unzip))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "automaton.jar"
@@ -98,55 +95,6 @@
     (home-page "https://github.com/spullara/cli-parser")
     (synopsis "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists.")
     (description "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists. Using annotations on your fields or JavaBean properties you can specify what configuration is available.")
-    (license license:asl2.0)))
-
-(define-public gant
-  (package
-    (name "gant")
-    (version "1.9.8")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/Gant/Gant.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "1ilcpyqkrz55jzl4avsdy76vpay602hxcw48prr5rf14zssjfv9x"))
-        (patches '("patches/gant.patch"))
-        (modules '((guix build utils)))
-        (snippet
-          '(delete-file-recursively "examples"))))
-    (native-inputs
-     (list ant groovy))
-    (build-system ant-build-system)
-    (arguments
-      `(#:jar-name "gant.jar"
-        #:source-dir "src/main/groovy"
-        #:tests? #f
-        #:phases
-        (modify-phases %standard-phases
-          (replace 'build
-           (lambda* (#:key inputs #:allow-other-keys)
-             (mkdir-p "build/classes")
-             (setenv "CLASSPATH"
-                     (string-join
-                       (apply append (map (lambda (input)
-                                            (find-files (assoc-ref inputs input)
-                                                        ".*.jar"))
-                                          '("ant" "groovy")))
-                       ":"))
-             (apply invoke "groovyc" "-d" "build/classes" "-j"
-                    (find-files "src/main/" ".*\\.(groovy|java)$"))
-             (invoke "ant" "jar")
-             #t)))))
-    (home-page "https://github.com/Gant/Gant")
-    (synopsis "Gant -- Groovy scripting of Ant tasks")
-    (description "Gant is a tool for scripting Ant tasks using Groovy instead of XML to specify
-the logic. A Gant specification is just a Groovy script and so can bring all
-the power of Groovy to bear directly, something not possible with Ant scripts.
-Whilst it might be seen as a competitor to Ant, Gant relies on all the Ant
-tasks for the complex actions, so it is really an alternative way of doing
-builds using Ant, but using a programming language rather than XML to specify
-the rules.")
     (license license:asl2.0)))
 
 (define protobuf-2.5
@@ -197,7 +145,7 @@ the rules.")
     (description "Protocol buffers are Google’s language-neutral, platform-neutral, extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. You define how you want your data to be structured once, then you can use special generated source code to easily write and read your structured data to and from a variety of data streams and using a variety of languages. This package contains Java API.")
     (license license:bsd-3)))
 
-(define java-jetbrains-annotations-java8
+(define java-jetbrains-annotations-java7
   (package
     (inherit java-jetbrains-annotations)
     (arguments
@@ -344,102 +292,6 @@ the rules.")
     (synopsis "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
     (description "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
     (license license:cc0)))
-
-;; (define-public intellij-jzlib-133
-;;   (package
-;;     (name "intellij-jzlib")
-;;     (version "133")
-;;     (source (origin
-;;         (method git-fetch)
-;;         (uri (git-reference
-;;               (url "https://github.com/JetBrains/intellij-community.git")
-;;               (commit version)))
-;;         (file-name (git-file-name name version))
-;;         (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-;;         (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-;;         (snippet
-;;           #~(begin
-;;               (invoke (string-append #$unzip "/bin/unzip")
-;;                        "./lib/src/jzlib-1.1.1.zip"
-;;                        "-d"
-;;                        "unzipped")
-;;               ;; Keep only the unzipped source (and ignore current/parent directory links)
-;;               (for-each (lambda (f)
-;;                           (delete-file-recursively f))
-;;                         (filter
-;;                           (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-;;                           (scandir ".")))
-;;               #t))))
-;;     (build-system ant-build-system)
-;;     (native-inputs
-;;       (list java-protobuf-api-2.5 unzip))
-;;     (arguments
-;;       `(#:jar-name "jzlib.jar"
-;;         #:source-dir "unzipped/jzlib-1.1.1/src/main/java"
-;;         #:tests? #f))
-;;     (home-page "https://www.jetbrains.com/opensource/idea/")
-;;     (synopsis "Vendored version of JZlib used in IntelliJ Platform")
-;;     (description "Vendored version of JZlib used in IntelliJ Platform")
-;;     (license license:bsd-3)))
-
-(define-public intellij-netty-133
-  (package
-    (name "intellij-netty")
-    (version "133")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/netty-all-sources.jar"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-
-              ;; Delete channel and codec implementations not used by JPS
-              (delete-file-recursively "unzipped/io/netty/channel/rxtx")
-              (delete-file-recursively "unzipped/io/netty/channel/udt")
-              (delete-file-recursively "unzipped/io/netty/handler/codec/compression")
-              (delete-file-recursively "unzipped/io/netty/handler/codec/http")
-              (delete-file-recursively "unzipped/io/netty/handler/codec/marshalling")
-              (delete-file-recursively "unzipped/io/netty/handler/codec/rtsp")
-              (delete-file-recursively "unzipped/io/netty/handler/codec/spdy")
-
-              (delete-file-recursively "unzipped/io/netty/example")
-              (delete-file-recursively "unzipped/io/netty/util/internal/chmv8")
-              (delete-file "unzipped/io/netty/util/internal/JavassistTypeParameterMatcherGenerator.java")
-              (substitute*
-                "unzipped/io/netty/util/internal/PlatformDependent.java"
-                (("import io\\.netty\\.util\\.internal\\.chmv8\\.ConcurrentHashMapV8;") "")
-                (("ConcurrentHashMapV8") "ConcurrentHashMap")
-                (("JavassistTypeParameterMatcherGenerator\\.generate\\(Object\\.class, PlatformDependent\\.class\\.getClassLoader\\(\\)\\)") ""))
-              (substitute*
-                "unzipped/io/netty/util/internal/TypeParameterMatcher.java"
-                (("PlatformDependent\\.hasJavassist\\(\\)") "false")
-                (("JavassistTypeParameterMatcherGenerator\\.generate\\(parameterType\\)") "null"))
-              #t))))
-    (build-system ant-build-system)
-    (native-inputs
-      (list java-commons-logging-minimal java-log4j-1.2-api java-protobuf-api-2.5 java-slf4j-api unzip))
-    (arguments
-      `(#:jar-name "netty-all.jar"
-        #:source-dir "unzipped"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "Vendored version of Netty used in IntelliJ Platform")
-    (description "Vendored version of Netty used in IntelliJ Platform")
-    (license license:asl2.0)))
 
 (define-public intellij-picocontainer-133
   (package
@@ -591,8 +443,8 @@ the rules.")
             (for-each delete-file
                 (find-files "." ".*\\.(jar|so)$"))
             #t))))
-    (native-inputs
-     (list ant intellij-asm4-133 intellij-compiler-instrumentation-133))
+    (propagated-inputs
+     (list intellij-compiler-instrumentation-util-133))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-compiler-javac2.jar"
@@ -604,9 +456,9 @@ the rules.")
     (description "IntelliJ Platform: compiler javac2 module.")
     (license license:asl2.0)))
 
-(define-public intellij-compiler-instrumentation-133
+(define-public intellij-compiler-instrumentation-util-133
   (package
-    (name "intellij-compiler-instrumentation")
+    (name "intellij-compiler-instrumentation-util")
     (version "133")
     (source (origin
         (method git-fetch)
@@ -626,7 +478,7 @@ the rules.")
             (for-each delete-file
                 (find-files "." ".*\\.(jar|so)$"))
             #t))))
-    (native-inputs
+    (propagated-inputs
      (list intellij-asm4-133))
     (build-system ant-build-system)
     (arguments
@@ -662,7 +514,9 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-automaton java-jdom java-jetbrains-annotations intellij-extensions-133 intellij-picocontainer-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-automaton intellij-extensions-133))
     (arguments
       `(#:jar-name "intellij-core-api.jar"
         #:source-dir "platform/core-api/src"
@@ -697,7 +551,9 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jdom java-jetbrains-annotations java-snappy intellij-boot-133 intellij-core-api-133 intellij-extensions-133 intellij-picocontainer-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-snappy intellij-boot-133 intellij-core-api-133))
     (arguments
       `(#:jar-name "intellij-core-impl.jar"
         #:source-dir "platform/core-impl/src"
@@ -732,7 +588,9 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jdom java-jetbrains-annotations java-xstream intellij-picocontainer-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-xstream intellij-util-133))
     (arguments
       `(#:jar-name "intellij-extensions.jar"
         #:source-dir "platform/extensions/src"
@@ -773,8 +631,8 @@ the rules.")
     (build-system ant-build-system)
     (native-inputs
       (list java-jetbrains-annotations))
-    (inputs
-     (list java-asm-3 java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform intellij-jsr166e-seqlock-133 intellij-picocontainer-133 intellij-util-rt-133 intellij-trove4j-133))
+    (propagated-inputs
+      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform intellij-jsr166e-seqlock-133 intellij-picocontainer-133 intellij-util-rt-133 intellij-trove4j-133))
     (arguments
       `(#:jar-name "intellij-util.jar"
         #:source-dir "platform/util/src"
@@ -809,7 +667,9 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jdom java-jetbrains-annotations intellij-core-api-133 intellij-extensions-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list intellij-core-api-133))
     (arguments
       `(#:jar-name "intellij-java-psi-api.jar"
         #:source-dir "java/java-psi-api/src"
@@ -850,7 +710,9 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jdom java-jetbrains-annotations intellij-asm4-133 intellij-core-api-133 intellij-core-impl-133 intellij-extensions-133 intellij-java-psi-api-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133))
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list intellij-asm4-133 intellij-core-impl-133 intellij-java-psi-api-133))
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
@@ -860,145 +722,6 @@ the rules.")
     (synopsis "IntelliJ Java PSI implementation")
     (description "IntelliJ Java psi-impl submodule")
     (license license:asl2.0)))
-
-(define-public intellij-jps-model-api-133
-  (package
-    (name "intellij-jps-model-api")
-    (version "133")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (modules '((guix build utils)))
-        (snippet
-          '(begin
-            (delete-file-recursively "bin")
-            (delete-file-recursively "lib")
-            (delete-file-recursively "plugins")
-            (delete-file-recursively "python")
-            (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
-            #t))))
-    (native-inputs
-     (list java-jetbrains-annotations intellij-util-rt-133))
-    (build-system ant-build-system)
-    (arguments
-      `(#:jar-name "intellij-jps-model-api.jar"
-        #:source-dir "jps/model-api/src"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "JetBrains Java Project System: Model API")
-    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-api' submodule.")
-    (license license:asl2.0)))
-
-(define-public intellij-jps-builders-133
-  (package
-    (name "intellij-jps-builders")
-    (version "133")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (modules '((guix build utils)))
-        (snippet
-          '(begin
-            (delete-file-recursively "bin")
-            (delete-file-recursively "lib")
-            (delete-file-recursively "plugins")
-            (delete-file-recursively "python")
-            (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
-            #t))))
-    (native-inputs
-     (list ant gant java-jetbrains-annotations java-log4j-1.2-api intellij-jps-model-api-133 intellij-util-rt-133 intellij-util-133 intellij-asm4-133 intellij-jsr166e-seqlock-133 intellij-netty-133 intellij-trove4j-133 java-protobuf-api-2.5 ))
-    (build-system ant-build-system)
-    (arguments
-      `(#:jar-name "intellij-jps-builders.jar"
-        #:source-dir "jps/jps-builders/src"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "JetBrains Java Project System: Builders")
-    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'builders' submodule only.")
-    (license license:asl2.0)))
-
-
-(define-public intellij-jps-standalone-builder-133
-  (package
-    (name "intellij-jps-standalone-builder")
-    (version "133")
-    (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-        (modules '((guix build utils)))
-        (snippet
-          '(begin
-            (delete-file-recursively "bin")
-            (delete-file-recursively "lib")
-            (delete-file-recursively "plugins")
-            (delete-file-recursively "python")
-            (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
-            #t))))
-    (native-inputs
-     (list ant gant))
-    (build-system ant-build-system)
-    (arguments
-      `(#:jar-name "intellij-jps-standalone-builder.jar"
-        #:source-dir "jps/standalone-builder"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "JetBrains Java Project System, Standalone builder.")
-    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains standalone builder only.")
-    (license license:asl2.0)))
-
-;; JPS is probably enough for compiling Kotlin, no need to build the sdk platform
-;; (define-public intellij-sdk-133
-;;   (package
-;;     (name "intellij-sdk")
-;;     (version "133")
-;;     (source (origin
-;;         (method git-fetch)
-;;         (uri (git-reference
-;;               (url "https://github.com/JetBrains/intellij-community.git")
-;;               (commit version)))
-;;         (file-name (git-file-name name version))
-;;         (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
-;;         (patches '("patches/sdk-133.patch"))
-;;         (modules '((guix build utils)))
-;;         (snippet
-;;           '(begin
-;;             (delete-file-recursively "bin")
-;;             (delete-file-recursively "lib")
-;;             (delete-file-recursively "plugins")
-;;             (delete-file-recursively "python")
-;;             (for-each delete-file
-;;                 (find-files "." ".*\\.(jar|so)$"))
-;;             (mkdir-p "lib")
-;;             #t))))
-;;     (native-inputs
-;;      (list ant gant))
-;;     (build-system ant-build-system)
-;;     (arguments
-;;       `(#:build-target "build"
-;;         #:tests? #f
-;;         #:make-flags
-;;         ,#~(list
-;;               (string-append "-Ddist.dir=" #$output "/share/java")
-;;               (string-append "-Dant-launcher.jar=" #$(this-package-native-input "ant") "/lib/ant-launcher.jar"))))
-;;     (home-page "https://www.jetbrains.com/opensource/idea/")
-;;     (synopsis "IntelliJ Platform")
-;;     (description "IntelliJ Platform")
-;;     (license license:asl2.0)))
 
 (define-public kotlin-dart-ast
   (package
@@ -1030,7 +753,9 @@ the rules.")
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jetbrains-annotations intellij-trove4j-133 intellij-util-133 intellij-util-rt-133 unzip))
+      (list java-jetbrains-annotations unzip))
+    (propagated-inputs
+      (list intellij-util-133))
     (arguments
       `(#:jar-name "dart-ast.jar"
         #:source-dir "unzipped"
@@ -1041,7 +766,7 @@ the rules.")
     (description "Vendored version dart-ast from the Kotlin source code")
     (license license:bsd-3)))
 
-(define-public kotlin-0-6-786
+(define-public kotlin-0.6.786
   (package
     (name "kotlin")
     (version "0.6.786")
@@ -1056,13 +781,14 @@ the rules.")
         (modules '((guix build utils)))
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
-    (native-inputs ;; TODO: Remove icedtea-7 from native-inputs
-     (list ant ant-contrib java-cli-parser java-jdom java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java8 java-protobuf-api-2.5 intellij-asm4-133 intellij-compiler-javac2-133 intellij-compiler-instrumentation-133 intellij-core-api-133 intellij-core-impl-133 intellij-extensions-133 intellij-java-psi-api-133 intellij-java-psi-impl-133 intellij-picocontainer-133 intellij-trove4j-133 intellij-util-133 intellij-util-rt-133 kotlin-dart-ast icedtea-7))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 kotlin-dart-ast icedtea-7))
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
     (build-system ant-build-system)
     (arguments
       `(#:build-target "dist"
         #:make-flags
-        ,#~(list (string-append "-Doutput=" #$output)
+        ,#~(list (string-append "-Dkotlin-home=" #$output)
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
              (string-append "-Dbuild.number=" #$version)
@@ -1141,7 +867,7 @@ the rules.")
                 (symlink
                   (string-append
                     (assoc-ref inputs "intellij-compiler-javac2")
-                    "/share/java/javac2.jar")
+                    "/share/java/intellij-compiler-javac2.jar")
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
@@ -1161,6 +887,4 @@ the rules.")
     (description "Kotlin programming language")
     (license license:asl2.0)))
 
-;; This allows you to run guix shell -f guix-packager.scm.
-;; Remove this line if you just want to define a package.
-kotlin-0-6-786
+kotlin-0.6.786
