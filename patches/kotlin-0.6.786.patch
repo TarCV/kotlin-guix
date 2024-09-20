@@ -69,3 +69,35 @@ index 00000000000..1cfe75cb242
      }
 
      @Nullable
+--- a/build-tools/ant/src/org/jetbrains/jet/buildtools/ant/KotlinCompilerAdapter.java
++++ b/build-tools/ant/src/org/jetbrains/jet/buildtools/ant/KotlinCompilerAdapter.java
+@@ -29,6 +29,7 @@
+         BytecodeCompilerTask kotlinTask = new BytecodeCompilerTask();
+         kotlinTask.setOutput(javac.getDestdir());
+         kotlinTask.setClasspath(javac.getClasspath());
++        org.jetbrains.jet.utils.PathUtil.setRtJar(javac.getBootclasspath().toString());
+         kotlinTask.setSrc(javac.getSrcdir());
+
+         kotlinTask.execute();
+--- a/compiler/util/src/org/jetbrains/jet/utils/PathUtil.java
++++ b/compiler/util/src/org/jetbrains/jet/utils/PathUtil.java
+@@ -40,5 +40,7 @@
+     private static final File NO_PATH = new File("<no_path>");
++    private static String rtJarPath = null;
++    public static synchronized void setRtJar(String path) { rtJarPath = path; }
+
+     private PathUtil() {}
+
+     @NotNull
+@@ -150,8 +152,10 @@
+     }
+
+     @NotNull
+-    public static File findRtJar() {
++    public static synchronized File findRtJar() {
++        if (rtJarPath != null) { return new File(rtJarPath); } else {
+         return findRtJar(System.getProperty("java.home"));
++        }
+     }
+
+     private static File findRtJar(String javaHome) {

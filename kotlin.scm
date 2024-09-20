@@ -484,7 +484,8 @@
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
         #:source-dir "java/compiler/instrumentation-util/src"
-        #:tests? #f))
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: compiler instrumentation-util module.")
     (description "IntelliJ Platform: compiler instrumentation-util module.")
@@ -792,8 +793,6 @@
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
              (string-append "-Dbuild.number=" #$version)
-             "-verbose"
-
              ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
              "-Djava.target=1.7")
         #:tests? #f
@@ -887,4 +886,127 @@
     (description "Kotlin programming language")
     (license license:asl2.0)))
 
-kotlin-0.6.786
+(define-public kotlin-0.6.1364
+  (package
+    (name "kotlin")
+    (version "0.6.1364")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1xz5q5cf866mcz0i6c24qnx9qldvm6nmfqbdfg8hk0ig2j9ygf15"))
+        (patches '("patches/kotlin-0.6.1364.patch")) ; TODO: Try updating kotlin-dart instead of using this patch
+        (modules '((guix build utils)))
+        (snippet `(for-each delete-file
+            (find-files "." ".*\\.jar$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 kotlin-dart-ast icedtea-7 kotlin-0.6.786))
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+        #:make-flags
+        ,#~(list (string-append "-Dkotlin-home=" #$output)
+             "-Dgenerate.javadoc=false"
+             "-Dshrink=false"
+             (string-append "-Dbuild.number=" #$version)
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+             "-Djava.target=1.7"
+             "-Dbuild.sysclasspath=ignore"
+             "-verbose")
+        #:tests? #f
+        #:phases
+          (modify-phases %standard-phases
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+            (add-before 'build 'add-bootclasspath
+              (lambda* (#:key inputs #:allow-other-keys)
+                (substitute* "build.xml"
+                  (("<javac2 " all) (string-append all "includeJavaRuntime=\"false\" bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
+                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+
+            (add-before 'build 'prepare-sdk-dir
+              (lambda* (#:key inputs #:allow-other-keys)
+                ;; build.xml expects exact file names in dependencies directory
+                (mkdir-p "dependencies/ant-1.7/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "ant")
+                    "/lib/ant.jar")
+                  "dependencies/ant-1.7/lib/ant.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-jline")
+                    "/share/java/jline.jar")
+                  "dependencies/jline.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-cli-parser")
+                    "/share/java/cli-parser.jar")
+                  "dependencies/cli-parser-1.1.1.jar")
+
+                (mkdir-p "ideaSDK/core")
+                (for-each
+                  (lambda (p)
+                    (for-each
+                      (lambda (f)
+                        (symlink
+                          f
+                          (string-append "ideaSDK/core/" (basename f))))
+                      (find-files
+                        (assoc-ref inputs p)
+                        "\\.jar$")))
+                  (list
+                    "java-cli-parser"
+                    "java-jdom"
+                    "java-guava"
+                    "java-javax-inject"
+                    "java-jetbrains-annotations"
+                    "java-log4j-1.2-api"
+                    "intellij-asm4"
+                    "intellij-core-api"
+                    "intellij-core-impl"
+                    "intellij-extensions"
+                    "intellij-java-psi-api"
+                    "intellij-java-psi-impl"
+                    "intellij-picocontainer"
+                    "intellij-trove4j"
+                    "intellij-util"
+                    "intellij-util-rt"
+                  ))
+
+                (mkdir-p "js/js.translator/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "kotlin-dart-ast")
+                    "/share/java/dart-ast.jar")
+                  "js/js.translator/lib/dart-ast.jar")
+
+                ;; build.xml expects exact file names in ideaSDK/lib
+                (mkdir-p "ideaSDK/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-compiler-javac2")
+                    "/share/java/intellij-compiler-javac2.jar")
+                  "ideaSDK/lib/javac2.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-asm4")
+                    "/share/java/asm4.jar")
+                  "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-protobuf-api")
+                    "/share/java/protobuf.jar")
+                  "ideaSDK/lib/protobuf-2.5.0.jar")
+                #t))
+
+            (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
+kotlin-0.6.1364
