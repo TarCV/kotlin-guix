@@ -58,17 +58,6 @@ index 00000000000..1cfe75cb242
 +public @interface KotlinTraitImpl {
 +    int abiVersion();
 +}
---- a/compiler/frontend.java/src/org/jetbrains/jet/lang/resolve/kotlin/VirtualFileKotlinClass.java
-+++ a/compiler/frontend.java/src/org/jetbrains/jet/lang/resolve/kotlin/VirtualFileKotlinClass.java
-@@ -82,7 +82,7 @@
-         }
-         catch (IOException e) {
-             throw ExceptionUtils.rethrow(e);
--        }
-+        } catch (Throwable t) { throw new RuntimeException("Exception in loadClassAnnotations for " + file, t); }
-     }
-
-     @Nullable
 --- a/build-tools/ant/src/org/jetbrains/jet/buildtools/ant/KotlinCompilerAdapter.java
 +++ b/build-tools/ant/src/org/jetbrains/jet/buildtools/ant/KotlinCompilerAdapter.java
 @@ -29,6 +29,7 @@

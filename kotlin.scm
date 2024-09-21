@@ -29,7 +29,7 @@
           '(begin
             (delete-file-recursively "lib")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (native-inputs
       (list java-commons-bcel java-commons-httpclient java-xerces))
@@ -197,7 +197,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -321,7 +321,7 @@
               (delete-file-recursively "unzipped")
 
               (for-each delete-file
-                  (find-files "." ".*\\.(jar|so)$"))
+                  (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -361,7 +361,7 @@
                           (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
                           (scandir ".")))
               (for-each delete-file
-                  (find-files "." ".*\\.(jar|so)$"))
+                  (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -407,7 +407,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -441,7 +441,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (propagated-inputs
      (list intellij-compiler-instrumentation-util-133))
@@ -476,7 +476,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (propagated-inputs
      (list intellij-asm4-133))
@@ -511,7 +511,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -548,7 +548,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -585,7 +585,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -622,7 +622,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
 
             ;; Delete Mac-only UI classes which are not needed for JPS
             (delete-file "platform/util/src/com/intellij/util/AppleHiDPIScaledImage.java")
@@ -664,7 +664,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -707,7 +707,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(jar|so)$"))
+                (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -724,7 +724,79 @@
     (description "IntelliJ Java psi-impl submodule")
     (license license:asl2.0)))
 
-(define-public kotlin-dart-ast
+(define-public intellij-jps-model-api-133
+  (package
+    (name "intellij-jps-model-api")
+    (version "133")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/intellij-community.git")
+              (commit version)))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (native-inputs
+     (list java-jetbrains-annotations))
+    (propagated-inputs
+     (list intellij-util-rt-133))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-jps-model-api.jar"
+        #:source-dir "jps/model-api/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "JetBrains Java Project System: Model API")
+    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-api' submodule.")
+    (license license:asl2.0)))
+
+(define-public intellij-jps-model-impl-133
+  (package
+    (name "intellij-jps-model-impl")
+    (version "133")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/intellij-community.git")
+              (commit version)))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (native-inputs
+     (list java-jetbrains-annotations))
+    (propagated-inputs
+     (list intellij-jps-model-api-133 intellij-util-133))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-jps-model-impl.jar"
+        #:source-dir "jps/model-impl/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "JetBrains Java Project System: Model implementation")
+    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
+    (license license:asl2.0)))
+
+(define-public kotlin-dart-ast-0.6.786
   (package
     (name "kotlin-dart-ast")
     (version "0.6.786")
@@ -750,7 +822,93 @@
                           (scandir ".")))
 
               (for-each delete-file
-                  (find-files "." ".*\\.(jar|so)$"))
+                  (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations unzip))
+    (propagated-inputs
+      (list intellij-util-133))
+    (arguments
+      `(#:jar-name "dart-ast.jar"
+        #:source-dir "unzipped"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "Vendored version dart-ast from the Kotlin source code")
+    (description "Vendored version dart-ast from the Kotlin source code")
+    (license license:bsd-3)))
+
+(define-public kotlin-dart-ast-0.6.1364
+  (package
+    (name "kotlin-dart-ast")
+    (version "0.6.1364")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1xz5q5cf866mcz0i6c24qnx9qldvm6nmfqbdfg8hk0ig2j9ygf15"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./js/js.translator/lib/src/dart-ast-src.jar"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+
+              (for-each delete-file
+                  (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations unzip))
+    (propagated-inputs
+      (list intellij-util-133))
+    (arguments
+      `(#:jar-name "dart-ast.jar"
+        #:source-dir "unzipped"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "Vendored version dart-ast from the Kotlin source code")
+    (description "Vendored version dart-ast from the Kotlin source code")
+    (license license:bsd-3)))
+
+(define-public kotlin-dart-ast-0.6.1932
+  (package
+    (name "kotlin-dart-ast")
+    (version "0.6.1932")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1r1psqwa5k7klkcyk96rva208zvy76j7nv69v9dfsak2zs1c43ip"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./js/js.translator/lib/src/dart-ast-src.jar"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+
+              (for-each delete-file
+                  (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -783,7 +941,7 @@
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
     (native-inputs
-      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 kotlin-dart-ast icedtea-7))
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 kotlin-dart-ast-0.6.786 icedtea-7))
     (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
     (build-system ant-build-system)
     (arguments
@@ -897,12 +1055,12 @@
               (commit (string-append "build-" version))))
         (file-name (git-file-name name version))
         (sha256 (base32 "1xz5q5cf866mcz0i6c24qnx9qldvm6nmfqbdfg8hk0ig2j9ygf15"))
-        (patches '("patches/kotlin-0.6.1364.patch")) ; TODO: Try updating kotlin-dart instead of using this patch
+        (patches '("patches/kotlin-0.6.1364.patch"))
         (modules '((guix build utils)))
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
     (native-inputs
-      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 kotlin-dart-ast icedtea-7 kotlin-0.6.786))
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 kotlin-dart-ast-0.6.1364 icedtea-7 kotlin-0.6.786))
     (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
     (build-system ant-build-system)
     (arguments
@@ -915,7 +1073,6 @@
              (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
              ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
              "-Djava.target=1.7"
-             "-Dbuild.sysclasspath=ignore"
              "-verbose")
         #:tests? #f
         #:phases
@@ -1009,4 +1166,262 @@
     (description "Kotlin programming language")
     (license license:asl2.0)))
 
-kotlin-0.6.1364
+(define-public kotlin-0.6.1932
+  (package
+    (name "kotlin")
+    (version "0.6.1932")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1r1psqwa5k7klkcyk96rva208zvy76j7nv69v9dfsak2zs1c43ip"))
+        (patches '("patches/kotlin-0.6.1932.patch"))
+        (modules '((guix build utils)))
+        (snippet `(for-each delete-file
+            (find-files "." ".*\\.jar$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 intellij-jps-model-impl-133 kotlin-dart-ast-0.6.1932 icedtea-7 kotlin-0.6.1364))
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+        #:make-flags
+        ,#~(list (string-append "-Dkotlin-home=" #$output)
+             "-Dgenerate.javadoc=false"
+             "-Dshrink=false"
+             (string-append "-Dbuild.number=" #$version)
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+             "-Djava.target=1.7"
+             "-verbose")
+        #:tests? #f
+        #:phases
+          (modify-phases %standard-phases
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+            (add-before 'build 'add-bootclasspath
+              (lambda* (#:key inputs #:allow-other-keys)
+                (substitute* "build.xml"
+                  (("<javac2 " all) (string-append all "includeJavaRuntime=\"false\" bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
+                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+
+            (add-before 'build 'prepare-sdk-dir
+              (lambda* (#:key inputs #:allow-other-keys)
+                (copy-recursively "runtime/src/org/jetbrains/annotations" "core/util.runtime/src/org/jetbrains")
+
+                ;; build.xml expects exact file names in dependencies directory
+                (mkdir-p "dependencies/ant-1.7/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "ant")
+                    "/lib/ant.jar")
+                  "dependencies/ant-1.7/lib/ant.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-jline")
+                    "/share/java/jline.jar")
+                  "dependencies/jline.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-cli-parser")
+                    "/share/java/cli-parser.jar")
+                  "dependencies/cli-parser-1.1.1.jar")
+
+                (mkdir-p "ideaSDK/core")
+                (for-each
+                  (lambda (p)
+                    (for-each
+                      (lambda (f)
+                        (symlink
+                          f
+                          (string-append "ideaSDK/core/" (basename f))))
+                      (find-files
+                        (assoc-ref inputs p)
+                        "\\.jar$")))
+                  (list
+                    "java-cli-parser"
+                    "java-jdom"
+                    "java-guava"
+                    "java-javax-inject"
+                    "java-jetbrains-annotations"
+                    "java-log4j-1.2-api"
+                    "intellij-asm4"
+                    "intellij-core-api"
+                    "intellij-core-impl"
+                    "intellij-extensions"
+                    "intellij-java-psi-api"
+                    "intellij-java-psi-impl"
+                    "intellij-jps-model-impl"
+                    "intellij-picocontainer"
+                    "intellij-trove4j"
+                    "intellij-util"
+                    "intellij-util-rt"
+                  ))
+
+                (mkdir-p "ideaSDK/jps")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-jps-model-impl")
+                    "share/java/intellij-jps-model-impl.jar")
+                  "ideaSDK/jps/jps-model.jar")
+
+                (mkdir-p "js/js.translator/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "kotlin-dart-ast")
+                    "/share/java/dart-ast.jar")
+                  "js/js.translator/lib/dart-ast.jar")
+
+                ;; build.xml expects exact file names in ideaSDK/lib
+                (mkdir-p "ideaSDK/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-compiler-javac2")
+                    "/share/java/intellij-compiler-javac2.jar")
+                  "ideaSDK/lib/javac2.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-asm4")
+                    "/share/java/asm4.jar")
+                  "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-protobuf-api")
+                    "/share/java/protobuf.jar")
+                  "ideaSDK/lib/protobuf-2.5.0.jar")
+                #t))
+
+            (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
+(define-public kotlin-0.6.2107
+  (package
+    (name "kotlin")
+    (version "0.6.2107")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1cg1r5xzd0sr8m592j1vyqdqid4plyr3f01lsmg7wal2hfl68mr1"))
+        (patches '("patches/kotlin-0.6.2107.patch"))
+        (modules '((guix build utils)))
+        (snippet `(for-each delete-file
+            (find-files "." ".*\\.jar$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 intellij-jps-model-impl-133 icedtea-7 kotlin-0.6.1932))
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+        #:make-flags
+        ,#~(list (string-append "-Dkotlin-home=" #$output)
+             "-Dgenerate.javadoc=false"
+             "-Dshrink=false"
+             (string-append "-Dbuild.number=" #$version)
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+             "-Djava.target=1.7"
+             "-verbose")
+        #:tests? #f
+        #:phases
+          (modify-phases %standard-phases
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+            (add-before 'build 'add-bootclasspath
+              (lambda* (#:key inputs #:allow-other-keys)
+                (substitute* "build.xml"
+                  (("<javac2 " all) (string-append all "includeJavaRuntime=\"false\" bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
+                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+
+            (add-before 'build 'prepare-sdk-dir
+              (lambda* (#:key inputs #:allow-other-keys)
+                ;; build.xml expects exact file names in dependencies directory
+                (mkdir-p "dependencies/ant-1.7/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "ant")
+                    "/lib/ant.jar")
+                  "dependencies/ant-1.7/lib/ant.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-jline")
+                    "/share/java/jline.jar")
+                  "dependencies/jline.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-cli-parser")
+                    "/share/java/cli-parser.jar")
+                  "dependencies/cli-parser-1.1.1.jar")
+
+                (mkdir-p "ideaSDK/core")
+                (for-each
+                  (lambda (p)
+                    (for-each
+                      (lambda (f)
+                        (symlink
+                          f
+                          (string-append "ideaSDK/core/" (basename f))))
+                      (find-files
+                        (assoc-ref inputs p)
+                        "\\.jar$")))
+                  (list
+                    "java-cli-parser"
+                    "java-jdom"
+                    "java-guava"
+                    "java-javax-inject"
+                    "java-jetbrains-annotations"
+                    "java-log4j-1.2-api"
+                    "intellij-asm4"
+                    "intellij-core-api"
+                    "intellij-core-impl"
+                    "intellij-extensions"
+                    "intellij-java-psi-api"
+                    "intellij-java-psi-impl"
+                    "intellij-jps-model-impl"
+                    "intellij-picocontainer"
+                    "intellij-trove4j"
+                    "intellij-util"
+                    "intellij-util-rt"
+                  ))
+
+                (mkdir-p "ideaSDK/jps")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-jps-model-impl")
+                    "share/java/intellij-jps-model-impl.jar")
+                  "ideaSDK/jps/jps-model.jar")
+
+                ;; build.xml expects exact file names in ideaSDK/lib
+                (mkdir-p "ideaSDK/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-compiler-javac2")
+                    "/share/java/intellij-compiler-javac2.jar")
+                  "ideaSDK/lib/javac2.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-asm4")
+                    "/share/java/asm4.jar")
+                  "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-protobuf-api")
+                    "/share/java/protobuf.jar")
+                  "ideaSDK/lib/protobuf-2.5.0.jar")
+                #t))
+
+            (add-before 'build 'add-noverify
+              (lambda _ (setenv "ANT_OPTS" "-noverify")))
+
+            (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
+kotlin-0.6.2107
