@@ -68,7 +68,7 @@ index 6443a7bb2de..4d5328c4406 100644
      @NotNull
 -    public static List<File> getJdkClassesRoots() {
 +    public static synchronized List<File> getJdkClassesRoots() {
-+        File javaPath = (rtJarPath != null) ? new File(rtJarPath).getParentFile() : new File(System.getProperty("java.home"));
++        File javaPath = (rtJarPath != null) ? new File(rtJarPath).getParentFile().getParentFile() : new File(System.getProperty("java.home"));
 -        return JavaSdkUtil.getJdkClassesRoots(new File(System.getProperty("java.home")), true);
 +        return JavaSdkUtil.getJdkClassesRoots(javaPath, true);
      }

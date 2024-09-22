@@ -90,3 +90,14 @@ index 00000000000..1cfe75cb242
      }
 
      private static File findRtJar(String javaHome) {
+--- a/compiler/backend/src/org/jetbrains/jet/codegen/ExpressionCodegen.java
++++ b/compiler/backend/src/org/jetbrains/jet/codegen/ExpressionCodegen.java
+@@ -181,7 +181,7 @@
+     }
+
+     protected InstructionAdapter createInstructionAdapter(MethodVisitor mv) {
+-        return new InstructionAdapter(methodVisitor) {
++        return new InstructionAdapter(ASM4, methodVisitor) {
+             @Override
+             public void visitLocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
+                 super.visitLocalVariable(name, desc, signature, start, end, index);

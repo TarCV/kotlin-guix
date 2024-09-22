@@ -152,6 +152,36 @@
       `(#:make-flags (list "-Dant.build.javac.target=1.7")
       ,@(package-arguments java-jetbrains-annotations)))))
 
+;; IntelliJ 133 vendors ASM 4.0, but we need Java 8 support so use the first major version supporting it
+(define java-asm5-intellij
+  (package
+    (inherit java-asm)
+    (name "java-asm5")
+    (version "5.2")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://gitlab.ow2.org/asm/asm.git")
+              (commit (string-append
+                        "ASM_"
+                        (string-map
+                          (lambda (c) (if (char=? c  #\.)  #\_ c))
+                          version)))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "155xckz8pxdlwf5rn9zhqklxqs2czgfrw6gddsjn70c5lfdmmjxj"))))
+    (synopsis "ASM library with patched Java package name")
+    (propagated-inputs '())
+    (arguments
+      `(#:make-flags (list "-Dant.build.javac.target=1.7")
+      ,@(substitute-keyword-arguments (package-arguments java-asm)
+        ((#:phases phases)
+         `(modify-phases ,phases
+            (delete 'remove-bnd-dependency)
+            (add-before 'build 'rename-packages
+              (lambda _
+                (substitute* (find-files "src" "\\.java$")
+                  (("([^[:alnum:]])org\\.objectweb\\.asm([^[:alnum:]])" all before after) (string-append before "org.jetbrains.asm4" after))))))))))))
+
 ;; Latest version not depending on Java 8 Predicate
 (define java-guava-20
   (package
@@ -183,12 +213,11 @@
     (name "intellij-util-rt")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
+        (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
           '(begin
@@ -212,22 +241,54 @@
     (description "IntelliJ Platform, util-rt submodule")
     (license license:asl2.0)))
 
-(define-public intellij-asm4-133
+(define-public intellij-util-rt-134
   (package
-    (name "intellij-asm4")
+    (name "intellij-util-rt")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (arguments
+      `(#:jar-name "intellij-util-rt.jar"
+        #:source-dir "platform/util-rt/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Util-rt")
+    (description "IntelliJ Platform, util-rt submodule")
+    (license license:asl2.0)))
+
+(define-public intellij-jsr166e-seqlock-133
+  (package
+    (name "intellij-jsr166e-seqlock")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
+        (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
         (snippet
           #~(begin
               (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/asm4-src.zip"
+                       "./lib/src/jsr166e_src.jar"
                        "-d"
                        "unzipped")
               ;; Keep only the unzipped source (and ignore current/parent directory links)
@@ -236,33 +297,33 @@
                         (filter
                           (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
                           (scandir ".")))
-              (substitute* (find-files "unzipped" "\\.java$")
-                (("org\\.jetbrains\\.asm\\.") "org.jetbrains.asm4."))
+
+              (mkdir "src")
+              (copy-file "unzipped/jsr166e/extra/SequenceLock.java" "src/SequenceLock.java")
+              (delete-file-recursively "unzipped")
             #t))))
     (build-system ant-build-system)
     (native-inputs
       (list unzip))
     (arguments
-      `(#:jar-name "intellij-asm4.jar"
-        #:source-dir "unzipped"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+      `(#:jar-name "jsr166e-seqlock.jar"
+        #:source-dir "src"
+        #:tests? #f))
     (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "Vendored version of ASM 4 used in IntelliJ Platform")
-    (description "Vendored version of ASM 4 used in IntelliJ Platform")
-    (license license:bsd-3)))
+    (synopsis "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
+    (description "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
+    (license license:cc0)))
 
-(define-public intellij-jsr166e-seqlock-133
+(define-public intellij-jsr166e-seqlock-134
   (package
     (name "intellij-jsr166e-seqlock")
-    (version "133")
+    (version "134")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
         (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
         (snippet
           #~(begin
@@ -298,12 +359,53 @@
     (name "intellij-picocontainer")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
+        (patches '("patches/sdk-133.patch"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./lib/src/picocontainer-src.zip"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+              (copy-recursively "unzipped/picocontainer-1_2" ".")
+              (delete-file-recursively "unzipped")
+
+              (for-each delete-file
+                  (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list unzip))
+    (arguments
+      `(#:jar-name "picocontainer.jar"
+        #:source-dir "container/src/java"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "Vendored version of picocontainer used in IntelliJ Platform")
+    (description "Vendored version of picocontainer used in IntelliJ Platform")
+    (license license:bsd-3)))
+
+(define-public intellij-picocontainer-134
+  (package
+    (name "intellij-picocontainer")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
         (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
         (snippet
           #~(begin
@@ -341,12 +443,61 @@
     (name "intellij-trove4j")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
+        (patches '("patches/sdk-133.patch"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
+        (snippet
+          #~(begin
+              (invoke (string-append #$unzip "/bin/unzip")
+                       "./lib/src/trove4j_src.jar"
+                       "-d"
+                       "unzipped")
+              ;; Keep only the unzipped source (and ignore current/parent directory links)
+              (for-each (lambda (f)
+                          (delete-file-recursively f))
+                        (filter
+                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
+                          (scandir ".")))
+              (for-each delete-file
+                  (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+     (list unzip))
+    (arguments
+      `(#:jar-name "trove4j.jar"
+        #:source-dir "unzipped/core/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'copy-generated-source
+            (lambda _
+              (copy-recursively "unzipped/generated/src"
+                                "unzipped/core/src")))
+;;           (add-before 'check 'fix-test-path
+;;             (lambda _
+;;               (substitute* "build.xml" (("\\$\\{test\\.home\\}/java") ""))
+;;             #t))
+         )))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "Vendored version of trove4j used in IntelliJ Platform")
+    (description "Vendored version of trove4j used in IntelliJ Platform")
+    (license license:asl2.0)))
+
+(define-public intellij-trove4j-134
+  (package
+    (name "intellij-trove4j")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
         (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
         (snippet
           #~(begin
@@ -392,13 +543,43 @@
     (name "intellij-boot")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (arguments
+      `(#:jar-name "intellij-boot.jar"
+        #:source-dir "platform/boot/src"
+        #:tests? #f))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Boot")
+    (description "IntelliJ Platform, boot submodule")
+    (license license:asl2.0)))
+
+(define-public intellij-boot-134
+  (package
+    (name "intellij-boot")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
         (modules '((guix build utils)))
         (snippet
           '(begin
@@ -426,12 +607,10 @@
     (name "intellij-compiler-javac2")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -456,17 +635,48 @@
     (description "IntelliJ Platform: compiler javac2 module.")
     (license license:asl2.0)))
 
+(define-public intellij-compiler-javac2-134
+  (package
+    (name "intellij-compiler-javac2")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (propagated-inputs
+     (list intellij-compiler-instrumentation-util-134))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-compiler-javac2.jar"
+        #:source-dir "java/compiler/javac2/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: compiler javac2 module.")
+    (description "IntelliJ Platform: compiler javac2 module.")
+    (license license:asl2.0)))
+
 (define-public intellij-compiler-instrumentation-util-133
   (package
     (name "intellij-compiler-instrumentation-util")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -479,13 +689,60 @@
                 (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (propagated-inputs
-     (list intellij-asm4-133))
+     (list java-asm5-intellij))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
         #:source-dir "java/compiler/instrumentation-util/src"
         #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+          (modify-phases %standard-phases
+            (add-before 'build 'patch-for-asm5
+              (lambda _
+                (substitute*
+                  "java/compiler/instrumentation-util/src/com/intellij/compiler/notNullVerification/NotNullVerifyingInstrumenter.java"
+                  (("Opcodes\\.ASM4") "Opcodes.ASM5")))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: compiler instrumentation-util module.")
+    (description "IntelliJ Platform: compiler instrumentation-util module.")
+    (license license:asl2.0)))
+
+(define-public intellij-compiler-instrumentation-util-134
+  (package
+    (name "intellij-compiler-instrumentation-util")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (propagated-inputs
+     (list java-asm5-intellij))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-compiler-instrumentation-util.jar"
+        #:source-dir "java/compiler/instrumentation-util/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+          (modify-phases %standard-phases
+            (add-before 'build 'patch-for-asm5
+              (lambda _
+                (substitute*
+                  "java/compiler/instrumentation-util/src/com/intellij/compiler/notNullVerification/NotNullVerifyingInstrumenter.java"
+                  (("Opcodes\\.ASM4") "Opcodes.ASM5")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: compiler instrumentation-util module.")
     (description "IntelliJ Platform: compiler instrumentation-util module.")
@@ -496,12 +753,10 @@
     (name "intellij-core-api")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -528,17 +783,50 @@
     (description "IntelliJ Platform, core-api submodule")
     (license license:asl2.0)))
 
+(define-public intellij-core-api-134
+  (package
+    (name "intellij-core-api")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-automaton intellij-extensions-134))
+    (arguments
+      `(#:jar-name "intellij-core-api.jar"
+        #:source-dir "platform/core-api/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Core API")
+    (description "IntelliJ Platform, core-api submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-core-impl-133
   (package
     (name "intellij-core-impl")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -565,17 +853,50 @@
     (description "IntelliJ Platform, core-impl submodule")
     (license license:asl2.0)))
 
+(define-public intellij-core-impl-134
+  (package
+    (name "intellij-core-impl")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-snappy intellij-boot-134 intellij-core-api-134))
+    (arguments
+      `(#:jar-name "intellij-core-impl.jar"
+        #:source-dir "platform/core-impl/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Core implementation")
+    (description "IntelliJ Platform, core-impl submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-extensions-133
   (package
     (name "intellij-extensions")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -602,17 +923,50 @@
     (description "IntelliJ Platform, extensions submodule")
     (license license:asl2.0)))
 
+(define-public intellij-extensions-134
+  (package
+    (name "intellij-extensions")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-xstream intellij-util-134))
+    (arguments
+      `(#:jar-name "intellij-extensions.jar"
+        #:source-dir "platform/extensions/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Extensions API")
+    (description "IntelliJ Platform, extensions submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-util-133
   (package
     (name "intellij-util")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -644,17 +998,55 @@
     (description "IntelliJ Platform, util submodule")
     (license license:asl2.0)))
 
+(define-public intellij-util-134
+  (package
+    (name "intellij-util")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+
+            ;; Delete Mac-only UI classes which are not needed for JPS
+            (delete-file "platform/util/src/com/intellij/util/AppleHiDPIScaledImage.java")
+            (delete-file "platform/util/src/com/intellij/util/ui/MacUIUtil.java")
+            (delete-file-recursively "platform/util/src/com/intellij/ui/mac")
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform intellij-jsr166e-seqlock-134 intellij-picocontainer-134 intellij-util-rt-134 intellij-trove4j-134))
+    (arguments
+      `(#:jar-name "intellij-util.jar"
+        #:source-dir "platform/util/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Util")
+    (description "IntelliJ Platform, util submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-java-psi-api-133
   (package
     (name "intellij-java-psi-api")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -687,17 +1079,56 @@
     (description "IntelliJ Java psi-api submodule")
     (license license:asl2.0)))
 
+(define-public intellij-java-psi-api-134
+  (package
+    (name "intellij-java-psi-api")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list intellij-core-api-134))
+    (arguments
+      `(#:jar-name "intellij-java-psi-api.jar"
+        #:source-dir "java/java-psi-api/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'copy-messages
+            (lambda _
+              (mkdir-p "build/classes/messages")
+              (copy-recursively "java/java-psi-api/src/messages" "build/classes/messages"))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Java PSI API")
+    (description "IntelliJ Java psi-api submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-java-psi-impl-133
   (package
     (name "intellij-java-psi-impl")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
         (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
@@ -713,7 +1144,42 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list intellij-asm4-133 intellij-core-impl-133 intellij-java-psi-api-133))
+      (list java-asm5-intellij intellij-core-impl-133 intellij-java-psi-api-133))
+    (arguments
+      `(#:jar-name "intellij-java-psi-impl.jar"
+        #:source-dir "java/java-psi-impl/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Java PSI implementation")
+    (description "IntelliJ Java psi-impl submodule")
+    (license license:asl2.0)))
+
+(define-public intellij-java-psi-impl-134
+  (package
+    (name "intellij-java-psi-impl")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list java-asm5-intellij intellij-core-impl-134 intellij-java-psi-api-134))
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
@@ -729,12 +1195,11 @@
     (name "intellij-jps-model-api")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
+        (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
           '(begin
@@ -760,17 +1225,51 @@
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-api' submodule.")
     (license license:asl2.0)))
 
+(define-public intellij-jps-model-api-134
+  (package
+    (name "intellij-jps-model-api")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (native-inputs
+     (list java-jetbrains-annotations))
+    (propagated-inputs
+     (list intellij-util-rt-134))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-jps-model-api.jar"
+        #:source-dir "jps/model-api/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "JetBrains Java Project System: Model API")
+    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-api' submodule.")
+    (license license:asl2.0)))
+
 (define-public intellij-jps-model-impl-133
   (package
     (name "intellij-jps-model-impl")
     (version "133")
     (source (origin
-        (method git-fetch)
-        (uri (git-reference
-              (url "https://github.com/JetBrains/intellij-community.git")
-              (commit version)))
-        (file-name (git-file-name name version))
-        (sha256 (base32 "0k4b1y8dpy3qza7hw5rms4afhjsgr5i8y7qx32fhyf3yybyg8npm"))
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
+        (patches '("patches/sdk-133.patch"))
         (modules '((guix build utils)))
         (snippet
           '(begin
@@ -785,6 +1284,41 @@
      (list java-jetbrains-annotations))
     (propagated-inputs
      (list intellij-jps-model-api-133 intellij-util-133))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-jps-model-impl.jar"
+        #:source-dir "jps/model-impl/src"
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "JetBrains Java Project System: Model implementation")
+    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
+    (license license:asl2.0)))
+
+(define-public intellij-jps-model-impl-134
+  (package
+    (name "intellij-jps-model-impl")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(class|jar|so)$"))
+            #t))))
+    (native-inputs
+     (list java-jetbrains-annotations))
+    (propagated-inputs
+     (list intellij-jps-model-api-134 intellij-util-134))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-jps-model-impl.jar"
@@ -950,18 +1484,15 @@
         ,#~(list (string-append "-Dkotlin-home=" #$output)
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
-             (string-append "-Dbuild.number=" #$version)
-             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
-             "-Djava.target=1.7")
+             (string-append "-Dbuild.number=" #$version))
         #:tests? #f
         #:phases
           (modify-phases %standard-phases
              ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
-            (add-before 'build 'add-bootclasspath
-              (lambda* (#:key inputs #:allow-other-keys)
-                (substitute* "build.xml"
-                  (("<javac2 " all) (string-append all "bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
-                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+             (add-before 'build 'add-bootclasspath
+               (lambda* (#:key inputs #:allow-other-keys)
+                 (substitute* "build.xml"
+                   (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
 
             (add-before 'build 'prepare-sdk-dir
               (lambda* (#:key inputs #:allow-other-keys)
@@ -1000,7 +1531,7 @@
                     "java-guava"
                     "java-javax-inject"
                     "java-jetbrains-annotations"
-                    "intellij-asm4"
+                    "java-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1028,8 +1559,8 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "intellij-asm4")
-                    "/share/java/asm4.jar")
+                    (assoc-ref inputs "java-asm5")
+                    "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
                   (string-append
@@ -1070,19 +1601,16 @@
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
              (string-append "-Dbuild.number=" #$version)
-             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
-             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
-             "-Djava.target=1.7"
-             "-verbose")
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin")))
         #:tests? #f
         #:phases
           (modify-phases %standard-phases
              ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
-            (add-before 'build 'add-bootclasspath
-              (lambda* (#:key inputs #:allow-other-keys)
-                (substitute* "build.xml"
+             (add-before 'build 'add-bootclasspath
+               (lambda* (#:key inputs #:allow-other-keys)
+                 (substitute* "build.xml"
                   (("<javac2 " all) (string-append all "includeJavaRuntime=\"false\" bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
-                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+                   (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
 
             (add-before 'build 'prepare-sdk-dir
               (lambda* (#:key inputs #:allow-other-keys)
@@ -1122,7 +1650,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "intellij-asm4"
+                    "java-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1150,8 +1678,8 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "intellij-asm4")
-                    "/share/java/asm4.jar")
+                    (assoc-ref inputs "java-asm5")
+                    "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
                   (string-append
@@ -1192,10 +1720,7 @@
              "-Dgenerate.javadoc=false"
              "-Dshrink=false"
              (string-append "-Dbuild.number=" #$version)
-             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
-             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
-             "-Djava.target=1.7"
-             "-verbose")
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin")))
         #:tests? #f
         #:phases
           (modify-phases %standard-phases
@@ -1246,7 +1771,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "intellij-asm4"
+                    "java-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1282,8 +1807,8 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "intellij-asm4")
-                    "/share/java/asm4.jar")
+                    (assoc-ref inputs "java-asm5")
+                    "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
                   (string-append
@@ -1325,8 +1850,6 @@
              "-Dshrink=false"
              (string-append "-Dbuild.number=" #$version)
              (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
-             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
-             "-Djava.target=1.7"
              "-verbose")
         #:tests? #f
         #:phases
@@ -1376,7 +1899,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "intellij-asm4"
+                    "java-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1405,8 +1928,8 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "intellij-asm4")
-                    "/share/java/asm4.jar")
+                    (assoc-ref inputs "java-asm5")
+                    "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
                   (string-append
@@ -1424,4 +1947,252 @@
     (description "Kotlin programming language")
     (license license:asl2.0)))
 
-kotlin-0.6.2107
+(define-public kotlin-0.6.2338
+  (package
+    (name "kotlin")
+    (version "0.6.2338")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "16b6z1xw8m0iwizxrqyfg49fii04q2dx9j00fxdvk6rxjyw0l48c"))
+        (patches '("patches/kotlin-0.6.2338.patch"))
+        (modules '((guix build utils)))
+        (snippet `(for-each delete-file
+            (find-files "." ".*\\.jar$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-133 intellij-java-psi-impl-133 intellij-jps-model-impl-133 icedtea-7 kotlin-0.6.2107))
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+        #:make-flags
+        ,#~(list (string-append "-Dkotlin-home=" #$output)
+             "-Dgenerate.javadoc=false"
+             "-Dshrink=false"
+             (string-append "-Dbuild.number=" #$version)
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
+             "-verbose")
+        #:tests? #f
+        #:phases
+          (modify-phases %standard-phases
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+            (add-before 'build 'add-bootclasspath
+              (lambda* (#:key inputs #:allow-other-keys)
+                (substitute* "build.xml"
+                  (("<javac2 " all) (string-append all "includeJavaRuntime=\"false\" bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
+                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+
+            (add-before 'build 'prepare-sdk-dir
+              (lambda* (#:key inputs #:allow-other-keys)
+                ;; build.xml expects exact file names in dependencies directory
+                (mkdir-p "dependencies/ant-1.7/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "ant")
+                    "/lib/ant.jar")
+                  "dependencies/ant-1.7/lib/ant.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-jline")
+                    "/share/java/jline.jar")
+                  "dependencies/jline.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-cli-parser")
+                    "/share/java/cli-parser.jar")
+                  "dependencies/cli-parser-1.1.1.jar")
+
+                (mkdir-p "ideaSDK/core")
+                (for-each
+                  (lambda (p)
+                    (for-each
+                      (lambda (f)
+                        (symlink
+                          f
+                          (string-append "ideaSDK/core/" (basename f))))
+                      (find-files
+                        (assoc-ref inputs p)
+                        "\\.jar$")))
+                  (list
+                    "java-cli-parser"
+                    "java-jdom"
+                    "java-guava"
+                    "java-javax-inject"
+                    "java-jetbrains-annotations"
+                    "java-log4j-1.2-api"
+                    "java-asm5"
+                    "intellij-core-api"
+                    "intellij-core-impl"
+                    "intellij-extensions"
+                    "intellij-java-psi-api"
+                    "intellij-java-psi-impl"
+                    "intellij-jps-model-impl"
+                    "intellij-picocontainer"
+                    "intellij-trove4j"
+                    "intellij-util"
+                    "intellij-util-rt"
+                  ))
+
+                (mkdir-p "ideaSDK/jps")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-jps-model-impl")
+                    "share/java/intellij-jps-model-impl.jar")
+                  "ideaSDK/jps/jps-model.jar")
+
+                ;; build.xml expects exact file names in ideaSDK/lib
+                (mkdir-p "ideaSDK/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-compiler-javac2")
+                    "/share/java/intellij-compiler-javac2.jar")
+                  "ideaSDK/lib/javac2.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-asm5")
+                    "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
+                  "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-protobuf-api")
+                    "/share/java/protobuf.jar")
+                  "ideaSDK/lib/protobuf-2.5.0.jar")
+                #t))
+
+            (add-before 'build 'add-noverify
+              (lambda _ (setenv "ANT_OPTS" "-noverify")))
+
+            (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
+(define-public kotlin-0.6.2451
+  (package
+    (name "kotlin")
+    (version "0.6.2451")
+    (source (origin
+        (method git-fetch)
+        (uri (git-reference
+              (url "https://github.com/JetBrains/kotlin.git")
+              (commit (string-append "build-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "16b6z1xw8m0iwizxrqyfg49fii04q2dx9j00fxdvk6rxjyw0l48c"))
+        (patches '("patches/kotlin-0.6.2451.patch"))
+        (modules '((guix build utils)))
+        (snippet `(for-each delete-file
+            (find-files "." ".*\\.jar$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-134 intellij-java-psi-impl-134 intellij-jps-model-impl-134 icedtea-7 kotlin-0.6.2338))
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+        #:make-flags
+        ,#~(list (string-append "-Dkotlin-home=" #$output)
+             "-Dgenerate.javadoc=false"
+             "-Dshrink=false"
+             (string-append "-Dbuild.number=" #$version)
+             (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
+             "-verbose")
+        #:tests? #f
+        #:phases
+          (modify-phases %standard-phases
+             ;; Target Java 7 and use its boot classes, because intellij-compiler-javac2 can't instrument classes when they reference any Java 8+ classes (including Object)
+            (add-before 'build 'add-bootclasspath
+              (lambda* (#:key inputs #:allow-other-keys)
+                (substitute* "build.xml"
+                  (("<javac2 " all) (string-append all "includeJavaRuntime=\"false\" bootclasspath=\"" (assoc-ref inputs "icedtea") "/lib/rt.jar\" "))
+                  (("<java classname=\"org\\.jetbrains\\.jet\\.cli\\.jvm\\.K2JVMCompiler\" " all) (string-append all "jvm=\"" (assoc-ref inputs "icedtea") "/bin/java\" ")))))
+
+            (add-before 'build 'prepare-sdk-dir
+              (lambda* (#:key inputs #:allow-other-keys)
+                ;; build.xml expects exact file names in dependencies directory
+                (mkdir-p "dependencies/ant-1.7/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "ant")
+                    "/lib/ant.jar")
+                  "dependencies/ant-1.7/lib/ant.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-jline")
+                    "/share/java/jline.jar")
+                  "dependencies/jline.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-cli-parser")
+                    "/share/java/cli-parser.jar")
+                  "dependencies/cli-parser-1.1.1.jar")
+
+                (mkdir-p "ideaSDK/core")
+                (for-each
+                  (lambda (p)
+                    (for-each
+                      (lambda (f)
+                        (symlink
+                          f
+                          (string-append "ideaSDK/core/" (basename f))))
+                      (find-files
+                        (assoc-ref inputs p)
+                        "\\.jar$")))
+                  (list
+                    "java-cli-parser"
+                    "java-jdom"
+                    "java-guava"
+                    "java-javax-inject"
+                    "java-jetbrains-annotations"
+                    "java-log4j-1.2-api"
+                    "java-asm5"
+                    "intellij-core-api"
+                    "intellij-core-impl"
+                    "intellij-extensions"
+                    "intellij-java-psi-api"
+                    "intellij-java-psi-impl"
+                    "intellij-jps-model-impl"
+                    "intellij-picocontainer"
+                    "intellij-trove4j"
+                    "intellij-util"
+                    "intellij-util-rt"
+                  ))
+
+                (mkdir-p "ideaSDK/jps")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-jps-model-impl")
+                    "share/java/intellij-jps-model-impl.jar")
+                  "ideaSDK/jps/jps-model.jar")
+
+                ;; build.xml expects exact file names in ideaSDK/lib
+                (mkdir-p "ideaSDK/lib")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "intellij-compiler-javac2")
+                    "/share/java/intellij-compiler-javac2.jar")
+                  "ideaSDK/lib/javac2.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-asm5")
+                    "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
+                  "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
+                (symlink
+                  (string-append
+                    (assoc-ref inputs "java-protobuf-api")
+                    "/share/java/protobuf.jar")
+                  "ideaSDK/lib/protobuf-2.5.0.jar")
+                #t))
+
+            (add-before 'build 'add-noverify
+              (lambda _ (setenv "ANT_OPTS" "-noverify")))
+
+            (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
+kotlin-0.6.2451
