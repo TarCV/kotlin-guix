@@ -197,159 +197,52 @@ index 8e6bdbcfa226..3e99367cf8ac 100644
 --- a/platform/util/src/com/intellij/util/text/DateFormatUtil.java
 +++ b/platform/util/src/com/intellij/util/text/DateFormatUtil.java
 @@ -19,8 +19,6 @@
- import com.intellij.openapi.diagnostic.Logger;
  import com.intellij.openapi.util.Clock;
  import com.intellij.openapi.util.SystemInfo;
+ import com.intellij.openapi.util.text.StringUtil;
 -import com.intellij.ui.mac.foundation.Foundation;
 -import com.intellij.ui.mac.foundation.ID;
- import org.jetbrains.annotations.NotNull;
-
- import java.text.DateFormat;
-@@ -330,142 +328,14 @@
-     }
+ import com.intellij.util.EnvironmentUtil;
+ import com.sun.jna.Memory;
+ import com.sun.jna.Native;
+@@ -342,36 +340,9 @@
+     return synced;
    }
 
-   @NotNull
-   static String getMacTimeFormat(final int type, @NotNull final DateType dateType) {
+   private static boolean getMacFormats(DateFormat[] formats) {
 +    throw new UnsupportedOperationException();
--    final ID autoReleasePool = Foundation.invoke("NSAutoreleasePool", "new");
+-    final int MacFormatterNoStyle = 0;
+-    final int MacFormatterShortStyle = 1;
+-    final int MacFormatterMediumStyle = 2;
+-    final int MacFormatterBehavior_10_4 = 1040;
+-
+-    ID autoReleasePool = Foundation.invoke("NSAutoreleasePool", "new");
 -    try {
--      final ID dateFormatter = Foundation.invoke("NSDateFormatter", "new");
+-      ID dateFormatter = Foundation.invoke("NSDateFormatter", "new");
 -      Foundation.invoke(dateFormatter, Foundation.createSelector("setFormatterBehavior:"), MacFormatterBehavior_10_4);
 -
--      int style;
--      switch (type) {
--        case DateFormat.SHORT:
--          style = MacFormatterShortStyle;
--          break;
--        case DateFormat.MEDIUM:
--          style = MacFormatterMediumStyle;
--          break;
--        case DateFormat.LONG:
--          style = MacFormatterLongStyle;
--          break;
--        case DateFormat.FULL:
--        default:
--          style = MacFormatterFullStyle;
--          break;
--      }
+-      formats[0] = invokeFormatter(dateFormatter, MacFormatterNoStyle, MacFormatterShortStyle);  // short date
+-      formats[1] = invokeFormatter(dateFormatter, MacFormatterShortStyle, MacFormatterNoStyle);  // short time
+-      formats[2] = invokeFormatter(dateFormatter, MacFormatterMediumStyle, MacFormatterNoStyle);  // medium time
+-      formats[3] = invokeFormatter(dateFormatter, MacFormatterShortStyle, MacFormatterShortStyle);  // short date/time
 -
--      int timeStyle;
--      int dateStyle;
--      switch (dateType) {
--        case DATE:
--          timeStyle = MacFormatterNoStyle;
--          dateStyle = style;
--          break;
--        case TIME:
--          timeStyle = style;
--          dateStyle = MacFormatterNoStyle;
--          break;
--        case DATETIME:
--        default:
--          timeStyle = style;
--          dateStyle = style;
--          break;
--      }
--
--      Foundation.invoke(dateFormatter, Foundation.createSelector("setTimeStyle:"), timeStyle);
--      Foundation.invoke(dateFormatter, Foundation.createSelector("setDateStyle:"), dateStyle);
--      String format = Foundation.toStringViaUTF8(Foundation.invoke(dateFormatter, Foundation.createSelector("dateFormat")));
--      assert format != null;
--      return format;
+-      return true;
 -    }
 -    finally {
 -      Foundation.invoke(autoReleasePool, Foundation.createSelector("release"));
 -    }
    }
+-
+-  private static DateFormat invokeFormatter(ID dateFormatter, int timeStyle, int dateStyle) {
+-    Foundation.invoke(dateFormatter, Foundation.createSelector("setTimeStyle:"), timeStyle);
+-    Foundation.invoke(dateFormatter, Foundation.createSelector("setDateStyle:"), dateStyle);
+-    String format = Foundation.toStringViaUTF8(Foundation.invoke(dateFormatter, Foundation.createSelector("dateFormat")));
+-    assert format != null;
+-    return new SimpleDateFormat(format.trim());
+-  }
 
-   @NotNull
-   static String convertMacPattern(@NotNull String macPattern) {
-+    throw new UnsupportedOperationException();
--    StringBuilder b = new StringBuilder();
--    boolean isSpecial = false;
--    boolean isText = false;
--
--    for (int i = 0; i < macPattern.length(); i++) {
--      char c = macPattern.charAt(i);
--      if (isSpecial) {
--        String replacement = null;
--        if (c == '%') replacement = "$";
--
--        // year
--        if (c == 'y') replacement = "yy";
--        if (c == 'Y') replacement = "yyyy";
--
--        // month
--        if (c == 'm') replacement = "MM";
--        if (c == 'b') replacement = "MMM";
--        if (c == 'B') replacement = "MMMMM";
--
--        // day on month
--        if (c == 'e') replacement = "d";
--        if (c == 'd') replacement = "dd";
--
--        // day of year
--        if (c == 'j') replacement = "DDD";
--
--        // day of week
--        if (c == 'w') replacement = "E"; // SimpleDateFormat doesn't support formatting weekday as a number
--        if (c == 'a') replacement = "EEE";
--        if (c == 'A') replacement = "EEEEE";
--
--        // hours
--        if (c == 'H') replacement = "HH"; // 0-24
--        //if (c == 'H') replacement = "k"; // 1-24
--        //if (c == 'I') replacement = "K"; // 0-11
--        if (c == 'I') replacement = "hh"; // 1-12
--
--        //minute
--        if (c == 'M') replacement = "mm";
--        //second
--        if (c == 'S') replacement = "ss";
--        //millisecond
--        if (c == 'F') replacement = "SSS";
--
--        //millisecond
--        if (c == 'p') replacement = "a";
--
--        //millisecond
--        if (c == 'Z') replacement = "zzz";
--        //millisecond
--        if (c == 'z') replacement = "Z";
--
--
--        //todo if (c == 'c') replacement = "MMMMM";, x, X
--
--        if (replacement == null) replacement = "'?%" + c + "?'";
--
--        b.append(replacement);
--        isSpecial = false;
--      }
--      else {
--        isSpecial = c == '%';
--        if (isSpecial) {
--          isText = false;
--        }
--        else {
--          if (isText) {
--            if (c == '\'' || Character.isWhitespace(c)) b.append('\'');
--            isText = !Character.isWhitespace(c);
--          }
--          else {
--            if (c == '\'' || !Character.isWhitespace(c)) b.append('\'');
--            isText = !Character.isWhitespace(c) && c != '\'';
--          }
--          b.append(c);
--
--          if (isText && i == macPattern.length() - 1) b.append('\'');
--        }
--      }
--    }
--    return b.toString();
-   }
-
-   @NotNull
+   private static boolean getUnixFormats(DateFormat[] formats) {
+     String localeStr = EnvironmentUtil.getValue("LC_TIME");
 --- a/platform/util/src/com/intellij/util/ui/IsRetina.java
 +++ b/platform/util/src/com/intellij/util/ui/IsRetina.java
 @@ -15,25 +15,11 @@
@@ -472,3 +365,61 @@ index 8e6bdbcfa226..3e99367cf8ac 100644
      }
      return hasContent ? result : null;
    }
+--- a/platform/util/src/com/intellij/util/xmlb/JDOMXIncluder.java
++++ b/platform/util/src/com/intellij/util/xmlb/JDOMXIncluder.java
+@@ -54,7 +54,7 @@
+       throw new NullPointerException("Document must not be null");
+     }
+
+-    Document result = original.clone();
++    Document result = (Document)original.clone();
+
+     Element root = result.getRootElement();
+     List<Content> resolved = resolve(root, base);
+@@ -330,10 +330,11 @@
+     Iterator<Attribute> attributes = original.getAttributes().iterator();
+     while (attributes.hasNext()) {
+       Attribute a = attributes.next();
+-      result.setAttribute(a.clone());
++      result.setAttribute((Attribute)a.clone());
+     }
+
+-    for (Content o : original.getContent())  {
++    for (Object oTmp : original.getContent())  {
++      Content o = (Content)oTmp;
+       if (o instanceof Element) {
+         Element element = (Element)o;
+         if (isIncludeElement(element)) {
+@@ -344,6 +345,6 @@
+         }
+       }
+       else {
+-        result.addContent(o.clone());
++        result.addContent((Content)o.clone());
+       }
+     } // end while
+--- a/platform/util/src/com/intellij/util/xmlb/OptionTagBinding.java
++++ b/platform/util/src/com/intellij/util/xmlb/OptionTagBinding.java
+@@ -108,7 +108,8 @@
+     }
+     else {
+       List<Object> children = new SmartList<Object>();
+-      for (Content child : element.getContent()) {
++      for (Object childTmp : element.getContent()) {
++        Content child = (Content) childTmp;
+         if (!XmlSerializerImpl.isIgnoredNode(child)) {
+           children.add(child);
+         }
+--- a/platform/extensions/src/com/intellij/openapi/extensions/impl/ExtensionsAreaImpl.java
++++ b/platform/extensions/src/com/intellij/openapi/extensions/impl/ExtensionsAreaImpl.java
+@@ -168,8 +168,8 @@
+     // has content
+     if (!extensionElement.getContent().isEmpty()) return true;
+     // has custom attributes
+-    for (Attribute attribute : extensionElement.getAttributes()) {
++    for (Object attribute : extensionElement.getAttributes()) {
+-      final String name = attribute.getName();
++      final String name = ((Attribute)attribute).getName();
+       if (!"implementation".equals(name) && !"id".equals(name) && !"order".equals(name)) {
+         return true;
+       }

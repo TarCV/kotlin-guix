@@ -10,11 +10,12 @@
   #:use-module (gnu packages java)
   #:use-module (gnu packages protobuf))
 
-;; TODO: replace vendored source with downloaded sources
-;; TODO: enable tests where possible
+;; TODO: enable tests where possible, otherwise mark a package not public
+;; TODO: replace vendored sources with downloaded sources
+;; TODO: verify output directories
 ;; TODO: verify quasiquotes and other magic characters
 
-(define-public ant-contrib
+(define ant-contrib
   (package
     (name "ant-contrib")
     (version "1.0b3")
@@ -32,25 +33,29 @@
                 (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (native-inputs
-      (list java-commons-bcel java-commons-httpclient java-xerces))
+      (list java-commons-bcel java-commons-httpclient java-junit java-xerces))
     (build-system ant-build-system)
     (arguments
       `(#:make-flags
-        ,#~(list (string-append "-Ddist.dir=" #$output "/share/java")
-             (string-append "-Dproject.version=" #$version))
-        #:tests? #f
+        ,#~(list (string-append "-Dproject.version=" #$version))
+        #:build-target "dist-stage"
+        #:tests? #f ;; Has some broken tests
+;;        #:test-target "test"
         #:phases
           (modify-phases %standard-phases
-            (add-after 'unpack 'fix-sources
+            (add-after 'unpack 'remove-ivy-dependent-task
+              ;; This task implementation depends on old Ivy
               (lambda _
                 (delete-file "src/java/net/sf/antcontrib/net/URLImportTask.java")
-                )))))
+                ))
+            (replace 'install (install-jars "target/stage"))
+            (add-after 'install 'install-doc (install-javadoc "target/stage/docs")))))
     (home-page "https://sourceforge.net/projects/ant-contrib/")
     (synopsis "Additional useful tasks and types for Ant")
     (description "Collection of user supplied task (like an <if> task) and a development playground for experimental tasks like a C/C++ compilation task for different compilers.")
     (license license:asl2.0)))
 
-(define-public java-automaton
+(define java-automaton
   (package
     (name "java-automaton")
     (version "1.12.4")
@@ -64,10 +69,13 @@
         (sha256 (base32 "0a2xndhhb6al26kn77q1i2g9a81pzcybzdckz4818wb3s46p8ayv"))))
     (build-system ant-build-system)
     (arguments
-      `(#:jar-name "automaton.jar"
-        #:source-dir "src"
-        #:tests? #f))
-    (home-page "https://sourceforge.net/projects/ant-contrib/")
+      `(#:build-target "all"
+        #:tests? #f ;; This version doesn't have any tests
+        #:phases
+        (modify-phases %standard-phases
+            (replace 'install (install-jars "dist"))
+            (add-after 'install 'install-doc (install-javadoc "doc")))))
+    (home-page "https://www.brics.dk/automaton/")
     (synopsis "Finite-state automata and regular expressions for Java")
     (description "This Java package contains a DFA/NFA (finite-state automata) implementation with Unicode alphabet (UTF16) and support for the standard regular expression operations (concatenation, union, Kleene star) and a number of non-standard ones (intersection, complement, etc.). In contrast to many other automaton/regexp packages, this package is fast, compact, and implements real, unrestricted regular operations. It uses a symbolic representation based on intervals of Unicode characters.")
     (license license:bsd-3)))
@@ -110,7 +118,8 @@
           (base32
           "0xxn9gxhvsgzz2sgmihzf6pf75clr05mqj6218camwrwajpcbgqk"))))))
 
-(define java-protobuf-api-2.5
+;; This is the latest version not requiring clients to know about StringLists
+(define-public java-protobuf-api-2.5
   (package
     (name "java-protobuf-api")
     (version "2.5.0")
@@ -124,12 +133,12 @@
           (base32
           "0xxn9gxhvsgzz2sgmihzf6pf75clr05mqj6218camwrwajpcbgqk"))))
     (native-inputs
-     (list protobuf-2.5))
+     (list java-cglib java-easymock-3.2 java-easymock-class-extension java-junit java-objenesis protobuf-2.5))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "protobuf.jar"
         #:source-dir "java/src/main"
-        #:tests? #f
+        #:test-dir "java/src/test"
         #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
         ,#~(modify-phases %standard-phases
@@ -138,8 +147,32 @@
               (invoke (string-append (assoc-ref inputs "protobuf") "/bin/protoc")
                        "--java_out=java/src/main/java"
                        "--proto_path=src"
-                       "src/google/protobuf/descriptor.proto")
-         )))))
+                       "src/google/protobuf/descriptor.proto")))
+          (add-before 'check 'generate-test-sources
+            (lambda* (#:key inputs #:allow-other-keys)
+              (invoke (string-append (assoc-ref inputs "protobuf") "/bin/protoc")
+                       "--java_out=java/src/test/java"
+                       "--proto_path=src"
+                       "--proto_path=java/src/test/java"
+                       "src/google/protobuf/unittest.proto"
+                       "src/google/protobuf/unittest_import.proto"
+                       "src/google/protobuf/unittest_import_public.proto"
+                       "src/google/protobuf/unittest_mset.proto"
+                       "java/src/test/java/com/google/protobuf/multiple_files_test.proto"
+                       "java/src/test/java/com/google/protobuf/nested_builders_test.proto"
+                       "java/src/test/java/com/google/protobuf/nested_extension.proto"
+                       "java/src/test/java/com/google/protobuf/nested_extension_lite.proto"
+                       "java/src/test/java/com/google/protobuf/non_nested_extension.proto"
+                       "java/src/test/java/com/google/protobuf/non_nested_extension_lite.proto"
+                       "java/src/test/java/com/google/protobuf/test_bad_identifiers.proto"
+                       "src/google/protobuf/unittest_optimize_for.proto"
+                       "src/google/protobuf/unittest_custom_options.proto"
+                       "src/google/protobuf/unittest_lite.proto"
+                       "src/google/protobuf/unittest_import_lite.proto"
+                       "src/google/protobuf/unittest_import_public_lite.proto"
+                       "src/google/protobuf/unittest_lite_imports_nonlite.proto"
+                       "src/google/protobuf/unittest_enormous_descriptor.proto"
+                       "src/google/protobuf/unittest_no_generic_services.proto"))))))
     (home-page "http://protobuf.dev/")
     (synopsis "Protocol Buffers are language-neutral, platform-neutral extensible mechanisms for serializing structured data. This package contains Java API.")
     (description "Protocol buffers are Google’s language-neutral, platform-neutral, extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. You define how you want your data to be structured once, then you can use special generated source code to easily write and read your structured data to and from a variety of data streams and using a variety of languages. This package contains Java API.")
@@ -153,7 +186,7 @@
       ,@(package-arguments java-jetbrains-annotations)))))
 
 ;; IntelliJ 133 vendors ASM 4.0, but we need Java 8 support so use the first major version supporting it
-(define java-asm5-intellij
+(define java-asm5
   (package
     (inherit java-asm)
     (name "java-asm5")
@@ -196,6 +229,7 @@
               (sha256
                (base32
                 "00h5cawdjic1vind3yivzh1f58flvm1yfmhsyqwyvmbvj1vakysp"))))
+    ;; Guava tests depend on Truth which has cyclic dependency back on Guava, so tests are disabled for now
     (arguments
       `(#:make-flags (list "-Dant.build.javac.target=1.7")
       ,@(substitute-keyword-arguments (package-arguments java-guava)
@@ -206,9 +240,13 @@
                 (substitute*
                   (find-files "." "\\.java$")
                   (("import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;") ""))))
+            (add-before 'check 'fix-test-filter
+              (lambda _
+                (substitute* "build.xml"
+                  (("\\$\\{test\\.home\\}/java") "${test.home}"))))
             (delete 'install-listenablefuture-stub))))))))
 
-(define-public intellij-util-rt-133
+(define intellij-util-rt-133
   (package
     (name "intellij-util-rt")
     (version "133")
@@ -234,14 +272,14 @@
     (arguments
       `(#:jar-name "intellij-util-rt.jar"
         #:source-dir "platform/util-rt/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util-rt")
     (description "IntelliJ Platform, util-rt submodule")
     (license license:asl2.0)))
 
-(define-public intellij-util-rt-134
+(define intellij-util-rt-134
   (package
     (name "intellij-util-rt")
     (version "134")
@@ -267,7 +305,7 @@
     (arguments
       `(#:jar-name "intellij-util-rt.jar"
         #:source-dir "platform/util-rt/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util-rt")
@@ -689,7 +727,7 @@
                 (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (propagated-inputs
-     (list java-asm5-intellij))
+     (list java-asm5))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
@@ -729,7 +767,7 @@
                 (find-files "." ".*\\.(class|jar|so)$"))
             #t))))
     (propagated-inputs
-     (list java-asm5-intellij))
+     (list java-asm5))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
@@ -1144,7 +1182,7 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list java-asm5-intellij intellij-core-impl-133 intellij-java-psi-api-133))
+      (list java-asm5 intellij-core-impl-133 intellij-java-psi-api-133))
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
@@ -1179,7 +1217,7 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list java-asm5-intellij intellij-core-impl-134 intellij-java-psi-api-134))
+      (list java-asm5 intellij-core-impl-134 intellij-java-psi-api-134))
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
@@ -2081,7 +2119,7 @@
               (url "https://github.com/JetBrains/kotlin.git")
               (commit (string-append "build-" version))))
         (file-name (git-file-name name version))
-        (sha256 (base32 "16b6z1xw8m0iwizxrqyfg49fii04q2dx9j00fxdvk6rxjyw0l48c"))
+        (sha256 (base32 "1ihk7nxdfhird7ai2l3xvjqpb0a717hqvm9g9697w4xq3jil8fla"))
         (patches '("patches/kotlin-0.6.2451.patch"))
         (modules '((guix build utils)))
         (snippet `(for-each delete-file
