@@ -30,7 +30,7 @@
           '(begin
             (delete-file-recursively "lib")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (native-inputs
       (list java-commons-bcel java-commons-httpclient java-junit java-xerces))
@@ -264,7 +264,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -297,7 +297,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -312,269 +312,104 @@
     (description "IntelliJ Platform, util-rt submodule")
     (license license:asl2.0)))
 
-(define-public intellij-jsr166e-seqlock-133
+(define java-jsr166e-seqlock
+  (let* ((name "java-jsr166e-seqlock")
+        (version "1.7")
+        (filename (string-append name "-" version ".java")))
+    (package
+      (name name)
+      (version version)
+      (source (origin
+          (method url-fetch)
+          (uri (string-append "https://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/jsr166/src/jsr166e/extra/SequenceLock.java?revision=" version "&view=co"))
+          (file-name filename)
+          (sha256 (base32 "1pv9lnj0mb7m50r0q9790jmdrpgnlwg8803ial4z5ip9n3zhnfzh"))))
+      (build-system ant-build-system)
+      (native-inputs
+        (list unzip))
+      (arguments
+        `(#:jar-name "jsr166e-seqlock.jar"
+          #:source-dir "."
+          #:tests? #f ;; This class doesn't have tests
+          #:phases
+          ,#~(modify-phases %standard-phases
+            (add-after 'unpack 'fix-file-name
+              (lambda _
+                (rename-file #$filename "SequenceLock.java"))))))
+      (home-page "https://gee.cs.oswego.edu/dl/concurrency-interest/index.html")
+      (synopsis "Java implementation of a reentrant mutual exclusion Lock where each lock acquisition/release advances a sequence number")
+      (description "Java implementation of a reentrant mutual exclusion Lock in which each lock acquisition or release advances a sequence number. While the implentation source requires only Java6 to compile and run by relying on other jsr166e code, this packages is compiled against JDK 8 having newer implementation of the same dependencies.")
+      (license license:cc0))))
+
+(define-public java-picocontainer
   (package
-    (name "intellij-jsr166e-seqlock")
-    (version "133")
+    (name "java-picocontainer")
+    (version "1.2")
     (source (origin
         (method url-fetch)
-        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
-        (file-name (string-append "intellij-community-" version ".tar.gz"))
-        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
-        (patches '("patches/sdk-133.patch"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/jsr166e_src.jar"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-
-              (mkdir "src")
-              (copy-file "unzipped/jsr166e/extra/SequenceLock.java" "src/SequenceLock.java")
-              (delete-file-recursively "unzipped")
-            #t))))
+        (uri (string-append "https://github.com/picocontainer/PicoContainer1/archive/refs/tags/picocontainer-" version ".tar.gz"))
+        (file-name (string-append "picocontainer-" version ".tar.gz"))
+        (sha256 (base32 "0xj0981p7zbbx6q7pkpl16bcmddb05qsxsgmwfz1x10xsm3pm892"))
+        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))))
     (build-system ant-build-system)
     (native-inputs
-      (list unzip))
-    (arguments
-      `(#:jar-name "jsr166e-seqlock.jar"
-        #:source-dir "src"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
-    (description "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
-    (license license:cc0)))
-
-(define-public intellij-jsr166e-seqlock-134
-  (package
-    (name "intellij-jsr166e-seqlock")
-    (version "134")
-    (source (origin
-        (method url-fetch)
-        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
-        (file-name (string-append "intellij-community-" version ".tar.gz"))
-        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
-        (patches '("patches/sdk-134.patch"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/jsr166e_src.jar"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-
-              (mkdir "src")
-              (copy-file "unzipped/jsr166e/extra/SequenceLock.java" "src/SequenceLock.java")
-              (delete-file-recursively "unzipped")
-            #t))))
-    (build-system ant-build-system)
-    (native-inputs
-      (list unzip))
-    (arguments
-      `(#:jar-name "jsr166e-seqlock.jar"
-        #:source-dir "src"
-        #:tests? #f))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
-    (description "SequenceLock from the vendored version of jsr166e used in IntelliJ Platform")
-    (license license:cc0)))
-
-(define-public intellij-picocontainer-133
-  (package
-    (name "intellij-picocontainer")
-    (version "133")
-    (source (origin
-        (method url-fetch)
-        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
-        (file-name (string-append "intellij-community-" version ".tar.gz"))
-        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
-        (patches '("patches/sdk-133.patch"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/picocontainer-src.zip"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-              (copy-recursively "unzipped/picocontainer-1_2" ".")
-              (delete-file-recursively "unzipped")
-
-              (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
-            #t))))
-    (build-system ant-build-system)
-    (native-inputs
-      (list unzip))
+      (list java-jmock-1 java-junit java-xstream))
     (arguments
       `(#:jar-name "picocontainer.jar"
         #:source-dir "container/src/java"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "Vendored version of picocontainer used in IntelliJ Platform")
-    (description "Vendored version of picocontainer used in IntelliJ Platform")
-    (license license:bsd-3)))
-
-(define-public intellij-picocontainer-134
-  (package
-    (name "intellij-picocontainer")
-    (version "134")
-    (source (origin
-        (method url-fetch)
-        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
-        (file-name (string-append "intellij-community-" version ".tar.gz"))
-        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
-        (patches '("patches/sdk-134.patch"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/picocontainer-src.zip"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-              (copy-recursively "unzipped/picocontainer-1_2" ".")
-              (delete-file-recursively "unzipped")
-
-              (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
-            #t))))
-    (build-system ant-build-system)
-    (native-inputs
-      (list unzip))
-    (arguments
-      `(#:jar-name "picocontainer.jar"
-        #:source-dir "container/src/java"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "Vendored version of picocontainer used in IntelliJ Platform")
-    (description "Vendored version of picocontainer used in IntelliJ Platform")
-    (license license:bsd-3)))
-
-(define-public intellij-trove4j-133
-  (package
-    (name "intellij-trove4j")
-    (version "133")
-    (source (origin
-        (method url-fetch)
-        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
-        (file-name (string-append "intellij-community-" version ".tar.gz"))
-        (sha256 (base32 "18b7k63349xfjqvp0mf8pwpbsdqpbxyg6v25zpmih1w61r1kyf8k"))
-        (patches '("patches/sdk-133.patch"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/trove4j_src.jar"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-              (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
-            #t))))
-    (build-system ant-build-system)
-    (native-inputs
-     (list unzip))
-    (arguments
-      `(#:jar-name "trove4j.jar"
-        #:source-dir "unzipped/core/src"
-        #:tests? #f
+        #:test-dir "container/src/test"
         #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
         (modify-phases %standard-phases
-          (add-before 'build 'copy-generated-source
+          (add-before 'build 'fix-ant-xml
             (lambda _
-              (copy-recursively "unzipped/generated/src"
-                                "unzipped/core/src")))
-;;           (add-before 'check 'fix-test-path
-;;             (lambda _
-;;               (substitute* "build.xml" (("\\$\\{test\\.home\\}/java") ""))
-;;             #t))
-         )))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "Vendored version of trove4j used in IntelliJ Platform")
-    (description "Vendored version of trove4j used in IntelliJ Platform")
-    (license license:asl2.0)))
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")
+                (("<javac " all) (string-append all "encoding=\"iso-8859-1\" "))))))))
+    (home-page "http://picocontainer.com/")
+    (synopsis "General purpose DI / IOC container")
+    (description "General purpose DI / IOC container")
+    (license license:bsd-3)))
 
-(define-public intellij-trove4j-134
-  (package
-    (name "intellij-trove4j")
-    (version "134")
-    (source (origin
-        (method url-fetch)
-        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
-        (file-name (string-append "intellij-community-" version ".tar.gz"))
-        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
-        (patches '("patches/sdk-134.patch"))
-        (modules '((guix build utils) (ice-9 ftw) (ice-9 regex)))
-        (snippet
-          #~(begin
-              (invoke (string-append #$unzip "/bin/unzip")
-                       "./lib/src/trove4j_src.jar"
-                       "-d"
-                       "unzipped")
-              ;; Keep only the unzipped source (and ignore current/parent directory links)
-              (for-each (lambda (f)
-                          (delete-file-recursively f))
-                        (filter
-                          (lambda (n) (not (regexp-match? (string-match "^\\.+$|^unzipped$" n))))
-                          (scandir ".")))
-              (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
-            #t))))
-    (build-system ant-build-system)
-    (native-inputs
-     (list unzip))
-    (arguments
-      `(#:jar-name "trove4j.jar"
-        #:source-dir "unzipped/core/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")
-        #:phases
-        (modify-phases %standard-phases
-          (add-before 'build 'copy-generated-source
-            (lambda _
-              (copy-recursively "unzipped/generated/src"
-                                "unzipped/core/src")))
-;;           (add-before 'check 'fix-test-path
-;;             (lambda _
-;;               (substitute* "build.xml" (("\\$\\{test\\.home\\}/java") ""))
-;;             #t))
-         )))
-    (home-page "https://www.jetbrains.com/opensource/idea/")
-    (synopsis "Vendored version of trove4j used in IntelliJ Platform")
-    (description "Vendored version of trove4j used in IntelliJ Platform")
-    (license license:asl2.0)))
+(define-public java-jetbrains-trove4j
+  (let ((commit "29150c19710ef1581c790d0502cf299583db7322")
+        (revision "1"))
+    (package
+      (name "java-jetbrains-trove4j")
+      (version (git-version "2016.8.24" revision commit))
+      (source (origin
+          (method git-fetch)
+          (uri (git-reference
+                (url "https://github.com/JetBrains/intellij-deps-trove4j.git")
+                (commit commit)))
+          (sha256 (base32 "1bd3bq6i18y0i3bqqkhizqi3cb0x0ja82zk902mqyz84hx8xljwd"))
+          (file-name (git-file-name name version))
+          (modules '((guix build utils)))
+          (snippet '(find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))))
+      (native-inputs (list java-junit))
+      (build-system ant-build-system)
+      (arguments
+        `(#:jar-name "jetbrains-trove4j.jar"
+          #:source-dir "core/src"
+          #:test-dir "test/src"
+          #:make-flags (list "-Dant.build.javac.target=1.7")
+          #:phases
+          (modify-phases %standard-phases
+            (add-before 'build 'copy-generated-source
+              (lambda _
+                ;; TODO: Should the code be regenerated instead?
+                (copy-recursively "generated/src"
+                                  "core/src")))
+              (add-before 'check 'patch-check-target
+                (lambda _
+                  (substitute* "build.xml"
+                    (("\\$\\{test\\.home\\}/java") "")
+                    (("<junit.+</junit>") "<java classname=\"gnu.trove.MapTest\" failonerror=\"true\" fork=\"true\"><classpath><pathelement path=\"${env.CLASSPATH}\"/><pathelement path=\"${classes.dir}\"/><pathelement path=\"${test.classes.dir}\"/></classpath></java>")))))))
+      (home-page "https://github.com/JetBrains/intellij-deps-trove4j")
+      (synopsis "JetBrains fork the Trove library. The Trove library provides high speed Object and primitive collections for Java.")
+      (description "The GNU Trove library has two objectives: 1. Provide \"free\" (as in \"free speech\" and \"free beer\"), fast, lightweight implementations of the java.util Collections API. These implementations are designed to be pluggable replacements for their JDK equivalents. 2. Whenever possible, provide the same collections support for primitive types. This gap in the JDK is often addressed by using the \"wrapper\" classes (java.lang.Integer, java.lang.Float, etc.) with Object-based collections. For most applications, however, collections which store primitives directly will require less space and yield significant performance gains.")
+      ;; Some classes are licensed under MIT variant
+      (license license:lgpl2.1+))))
 
 (define-public intellij-boot-133
   (package
@@ -594,7 +429,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -626,7 +461,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -658,7 +493,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (propagated-inputs
      (list intellij-compiler-instrumentation-util-133))
@@ -691,7 +526,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (propagated-inputs
      (list intellij-compiler-instrumentation-util-134))
@@ -724,7 +559,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (propagated-inputs
      (list java-asm5))
@@ -764,7 +599,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (propagated-inputs
      (list java-asm5))
@@ -804,7 +639,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -839,7 +674,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -874,7 +709,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -909,7 +744,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -944,7 +779,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -979,7 +814,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1014,7 +849,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
 
             ;; Delete Mac-only UI classes which are not needed for JPS
             (delete-file "platform/util/src/com/intellij/util/AppleHiDPIScaledImage.java")
@@ -1025,7 +860,7 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform intellij-jsr166e-seqlock-133 intellij-picocontainer-133 intellij-util-rt-133 intellij-trove4j-133))
+      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform java-jsr166e-seqlock java-picocontainer intellij-util-rt-133 java-jetbrains-trove4j))
     (arguments
       `(#:jar-name "intellij-util.jar"
         #:source-dir "platform/util/src"
@@ -1054,7 +889,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
 
             ;; Delete Mac-only UI classes which are not needed for JPS
             (delete-file "platform/util/src/com/intellij/util/AppleHiDPIScaledImage.java")
@@ -1065,7 +900,7 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform intellij-jsr166e-seqlock-134 intellij-picocontainer-134 intellij-util-rt-134 intellij-trove4j-134))
+      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform java-jsr166e-seqlock java-picocontainer intellij-util-rt-134 java-jetbrains-trove4j))
     (arguments
       `(#:jar-name "intellij-util.jar"
         #:source-dir "platform/util/src"
@@ -1094,7 +929,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1135,7 +970,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1176,7 +1011,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1211,7 +1046,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1246,7 +1081,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (native-inputs
      (list java-jetbrains-annotations))
@@ -1281,7 +1116,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (native-inputs
      (list java-jetbrains-annotations))
@@ -1316,7 +1151,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (native-inputs
      (list java-jetbrains-annotations))
@@ -1351,7 +1186,7 @@
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
             (for-each delete-file
-                (find-files "." ".*\\.(class|jar|so)$"))
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (native-inputs
      (list java-jetbrains-annotations))
@@ -1394,7 +1229,7 @@
                           (scandir ".")))
 
               (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
+                  (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1437,7 +1272,7 @@
                           (scandir ".")))
 
               (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
+                  (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1480,7 +1315,7 @@
                           (scandir ".")))
 
               (for-each delete-file
-                  (find-files "." ".*\\.(class|jar|so)$"))
+                  (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (build-system ant-build-system)
     (native-inputs
@@ -1575,8 +1410,8 @@
                     "intellij-extensions"
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
-                    "intellij-picocontainer"
-                    "intellij-trove4j"
+                    "java-picocontainer"
+                    "java-jetbrains-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
@@ -1694,8 +1529,8 @@
                     "intellij-extensions"
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
-                    "intellij-picocontainer"
-                    "intellij-trove4j"
+                    "java-picocontainer"
+                    "java-jetbrains-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
@@ -1816,8 +1651,8 @@
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
                     "intellij-jps-model-impl"
-                    "intellij-picocontainer"
-                    "intellij-trove4j"
+                    "java-picocontainer"
+                    "java-jetbrains-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
@@ -1944,8 +1779,8 @@
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
                     "intellij-jps-model-impl"
-                    "intellij-picocontainer"
-                    "intellij-trove4j"
+                    "java-picocontainer"
+                    "java-jetbrains-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
@@ -2068,8 +1903,8 @@
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
                     "intellij-jps-model-impl"
-                    "intellij-picocontainer"
-                    "intellij-trove4j"
+                    "java-picocontainer"
+                    "java-jetbrains-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
@@ -2192,8 +2027,8 @@
                     "intellij-java-psi-api"
                     "intellij-java-psi-impl"
                     "intellij-jps-model-impl"
-                    "intellij-picocontainer"
-                    "intellij-trove4j"
+                    "java-picocontainer"
+                    "java-jetbrains-trove4j"
                     "intellij-util"
                     "intellij-util-rt"
                   ))
