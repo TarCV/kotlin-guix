@@ -14,6 +14,8 @@
 ;; TODO: replace vendored sources with downloaded sources
 ;; TODO: verify output directories
 ;; TODO: verify quasiquotes and other magic characters
+;; TODO: should intellij packages be merged, or their patches be splitted?
+;; TODO: compare dart sources with each other
 
 (define ant-contrib
   (package
@@ -105,7 +107,7 @@
     (description "CLI Parser is a tiny (10k jar), super easy to use library for parsing various kinds of command line arguments or property lists. Using annotations on your fields or JavaBean properties you can specify what configuration is available.")
     (license license:asl2.0)))
 
-(define protobuf-2.5
+(define-public protobuf-2.5
   (package
     (inherit protobuf-2)
     (version "2.5.0")
@@ -204,6 +206,7 @@
         (sha256 (base32 "155xckz8pxdlwf5rn9zhqklxqs2czgfrw6gddsjn70c5lfdmmjxj"))))
     (synopsis "ASM library with patched Java package name")
     (propagated-inputs '())
+    ;; Disable tests because base package disables them
     (arguments
       `(#:make-flags (list "-Dant.build.javac.target=1.7")
       ,@(substitute-keyword-arguments (package-arguments java-asm)
@@ -240,7 +243,7 @@
                 (substitute*
                   (find-files "." "\\.java$")
                   (("import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;") ""))))
-            (add-before 'check 'fix-test-filter
+            (add-before 'check 'fix-test-target
               (lambda _
                 (substitute* "build.xml"
                   (("\\$\\{test\\.home\\}/java") "${test.home}"))))
@@ -406,12 +409,12 @@
                     (("\\$\\{test\\.home\\}/java") "")
                     (("<junit.+</junit>") "<java classname=\"gnu.trove.MapTest\" failonerror=\"true\" fork=\"true\"><classpath><pathelement path=\"${env.CLASSPATH}\"/><pathelement path=\"${classes.dir}\"/><pathelement path=\"${test.classes.dir}\"/></classpath></java>")))))))
       (home-page "https://github.com/JetBrains/intellij-deps-trove4j")
-      (synopsis "JetBrains fork the Trove library. The Trove library provides high speed Object and primitive collections for Java.")
+      (synopsis "JetBrains fork of the Trove library. The Trove library provides high speed Object and primitive collections for Java.")
       (description "The GNU Trove library has two objectives: 1. Provide \"free\" (as in \"free speech\" and \"free beer\"), fast, lightweight implementations of the java.util Collections API. These implementations are designed to be pluggable replacements for their JDK equivalents. 2. Whenever possible, provide the same collections support for primitive types. This gap in the JDK is often addressed by using the \"wrapper\" classes (java.lang.Integer, java.lang.Float, etc.) with Object-based collections. For most applications, however, collections which store primitives directly will require less space and yield significant performance gains.")
       ;; Some classes are licensed under MIT variant
       (license license:lgpl2.1+))))
 
-(define-public intellij-boot-133
+(define intellij-boot-133
   (package
     (name "intellij-boot")
     (version "133")
@@ -443,7 +446,7 @@
     (description "IntelliJ Platform, boot submodule")
     (license license:asl2.0)))
 
-(define-public intellij-boot-134
+(define intellij-boot-134
   (package
     (name "intellij-boot")
     (version "134")
@@ -475,7 +478,7 @@
     (description "IntelliJ Platform, boot submodule")
     (license license:asl2.0)))
 
-(define-public intellij-compiler-javac2-133
+(define intellij-compiler-javac2-133
   (package
     (name "intellij-compiler-javac2")
     (version "133")
@@ -501,14 +504,14 @@
     (arguments
       `(#:jar-name "intellij-compiler-javac2.jar"
         #:source-dir "java/compiler/javac2/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: compiler javac2 module.")
     (description "IntelliJ Platform: compiler javac2 module.")
     (license license:asl2.0)))
 
-(define-public intellij-compiler-javac2-134
+(define intellij-compiler-javac2-134
   (package
     (name "intellij-compiler-javac2")
     (version "134")
@@ -534,14 +537,14 @@
     (arguments
       `(#:jar-name "intellij-compiler-javac2.jar"
         #:source-dir "java/compiler/javac2/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: compiler javac2 module.")
     (description "IntelliJ Platform: compiler javac2 module.")
     (license license:asl2.0)))
 
-(define-public intellij-compiler-instrumentation-util-133
+(define intellij-compiler-instrumentation-util-133
   (package
     (name "intellij-compiler-instrumentation-util")
     (version "133")
@@ -567,7 +570,7 @@
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
         #:source-dir "java/compiler/instrumentation-util/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
           (modify-phases %standard-phases
@@ -581,7 +584,7 @@
     (description "IntelliJ Platform: compiler instrumentation-util module.")
     (license license:asl2.0)))
 
-(define-public intellij-compiler-instrumentation-util-134
+(define intellij-compiler-instrumentation-util-134
   (package
     (name "intellij-compiler-instrumentation-util")
     (version "134")
@@ -607,7 +610,7 @@
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
         #:source-dir "java/compiler/instrumentation-util/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
           (modify-phases %standard-phases
@@ -621,7 +624,7 @@
     (description "IntelliJ Platform: compiler instrumentation-util module.")
     (license license:asl2.0)))
 
-(define-public intellij-core-api-133
+(define intellij-core-api-133
   (package
     (name "intellij-core-api")
     (version "133")
@@ -649,14 +652,14 @@
     (arguments
       `(#:jar-name "intellij-core-api.jar"
         #:source-dir "platform/core-api/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Core API")
     (description "IntelliJ Platform, core-api submodule")
     (license license:asl2.0)))
 
-(define-public intellij-core-api-134
+(define intellij-core-api-134
   (package
     (name "intellij-core-api")
     (version "134")
@@ -684,14 +687,14 @@
     (arguments
       `(#:jar-name "intellij-core-api.jar"
         #:source-dir "platform/core-api/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Core API")
     (description "IntelliJ Platform, core-api submodule")
     (license license:asl2.0)))
 
-(define-public intellij-core-impl-133
+(define intellij-core-impl-133
   (package
     (name "intellij-core-impl")
     (version "133")
@@ -719,14 +722,14 @@
     (arguments
       `(#:jar-name "intellij-core-impl.jar"
         #:source-dir "platform/core-impl/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Core implementation")
     (description "IntelliJ Platform, core-impl submodule")
     (license license:asl2.0)))
 
-(define-public intellij-core-impl-134
+(define intellij-core-impl-134
   (package
     (name "intellij-core-impl")
     (version "134")
@@ -754,14 +757,19 @@
     (arguments
       `(#:jar-name "intellij-core-impl.jar"
         #:source-dir "platform/core-impl/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:tests? #f ;; This module doesn't have tests
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+          (modify-phases %standard-phases
+            (add-before 'build 'copy-minimal-metadata
+              (lambda _
+                (copy-recursively "resources-kotlin/src" "build/classes"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Core implementation")
     (description "IntelliJ Platform, core-impl submodule")
     (license license:asl2.0)))
 
-(define-public intellij-extensions-133
+(define intellij-extensions-133
   (package
     (name "intellij-extensions")
     (version "133")
@@ -783,20 +791,26 @@
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jetbrains-annotations))
+      (list java-jetbrains-annotations java-jmock-1 java-junit))
     (propagated-inputs
       (list java-xstream intellij-util-133))
     (arguments
       `(#:jar-name "intellij-extensions.jar"
         #:source-dir "platform/extensions/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:test-dir "platform/extensions/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Extensions API")
     (description "IntelliJ Platform, extensions submodule")
     (license license:asl2.0)))
 
-(define-public intellij-extensions-134
+(define intellij-extensions-134
   (package
     (name "intellij-extensions")
     (version "134")
@@ -818,20 +832,26 @@
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jetbrains-annotations))
+      (list java-jetbrains-annotations java-jmock-1 java-junit java-hamcrest-all))
     (propagated-inputs
       (list java-xstream intellij-util-134))
     (arguments
       `(#:jar-name "intellij-extensions.jar"
         #:source-dir "platform/extensions/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:test-dir "platform/extensions/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Extensions API")
     (description "IntelliJ Platform, extensions submodule")
     (license license:asl2.0)))
 
-(define-public intellij-util-133
+(define intellij-util-133
   (package
     (name "intellij-util")
     (version "133")
@@ -844,7 +864,12 @@
         (modules '((guix build utils)))
         (snippet
           '(begin
+            ;; Keep "bin/idea.properties" as it is needed for tests
+            (rename-file "bin/idea.properties" "idea.properties")
             (delete-file-recursively "bin")
+            (mkdir "bin")
+            (rename-file "idea.properties" "bin/idea.properties")
+
             (delete-file-recursively "lib")
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
@@ -858,20 +883,38 @@
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jetbrains-annotations))
+      (list java-jetbrains-annotations java-junit java-hamcrest-all))
     (propagated-inputs
       (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform java-jsr166e-seqlock java-picocontainer intellij-util-rt-133 java-jetbrains-trove4j))
     (arguments
       `(#:jar-name "intellij-util.jar"
         #:source-dir "platform/util/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:tests? #f ;; TODO: implement additional modules required for the tests
+;;         #:test-dir "platform/util/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'remove-tests
+            (lambda _
+              (for-each delete-file
+                (list
+                  ;; Remove a Mac only test
+                  "platform/util/testSrc/com/intellij/util/FoundationTest.java"
+                  ;; Remove a UI test
+                  "platform/util/testSrc/com/intellij/openapi/ui/SplitterTest.java"
+                  ;; Remove tests requiring resources from other modules
+                  "platform/util/testSrc/com/intellij/util/diff/DiffTest.java"
+                  "platform/util/testSrc/com/intellij/util/io/zip/ReorderJarsTest.java"))))
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util")
     (description "IntelliJ Platform, util submodule")
     (license license:asl2.0)))
 
-(define-public intellij-util-134
+(define intellij-util-134
   (package
     (name "intellij-util")
     (version "134")
@@ -884,7 +927,12 @@
         (modules '((guix build utils)))
         (snippet
           '(begin
+            ;; Keep "bin/idea.properties" as it is needed for tests
+            (rename-file "bin/idea.properties" "idea.properties")
             (delete-file-recursively "bin")
+            (mkdir "bin")
+            (rename-file "idea.properties" "bin/idea.properties")
+
             (delete-file-recursively "lib")
             (delete-file-recursively "plugins")
             (delete-file-recursively "python")
@@ -898,14 +946,32 @@
             #t))))
     (build-system ant-build-system)
     (native-inputs
-      (list java-jetbrains-annotations))
+      (list java-jetbrains-annotations java-junit java-hamcrest-all))
     (propagated-inputs
       (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform java-jsr166e-seqlock java-picocontainer intellij-util-rt-134 java-jetbrains-trove4j))
     (arguments
       `(#:jar-name "intellij-util.jar"
         #:source-dir "platform/util/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:tests? #f ;; TODO: implement additional modules required for the tests
+;;         #:test-dir "platform/util/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'remove-tests
+            (lambda _
+              (for-each delete-file
+                (list
+                  ;; Remove a Mac only test
+                  "platform/util/testSrc/com/intellij/util/FoundationTest.java"
+                  ;; Remove a UI test
+                  "platform/util/testSrc/com/intellij/openapi/ui/SplitterTest.java"
+                  ;; Remove tests requiring resources from other modules
+                  "platform/util/testSrc/com/intellij/util/diff/DiffTest.java"
+                  "platform/util/testSrc/com/intellij/util/io/zip/ReorderJarsTest.java"))))
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Util")
     (description "IntelliJ Platform, util submodule")
@@ -939,7 +1005,7 @@
     (arguments
       `(#:jar-name "intellij-java-psi-api.jar"
         #:source-dir "java/java-psi-api/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
         (modify-phases %standard-phases
@@ -980,7 +1046,7 @@
     (arguments
       `(#:jar-name "intellij-java-psi-api.jar"
         #:source-dir "java/java-psi-api/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")
         #:phases
         (modify-phases %standard-phases
@@ -1021,7 +1087,7 @@
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Java PSI implementation")
@@ -1056,7 +1122,7 @@
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Java PSI implementation")
@@ -1091,7 +1157,7 @@
     (arguments
       `(#:jar-name "intellij-jps-model-api.jar"
         #:source-dir "jps/model-api/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "JetBrains Java Project System: Model API")
@@ -1126,7 +1192,7 @@
     (arguments
       `(#:jar-name "intellij-jps-model-api.jar"
         #:source-dir "jps/model-api/src"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "JetBrains Java Project System: Model API")
@@ -1161,8 +1227,15 @@
     (arguments
       `(#:jar-name "intellij-jps-model-impl.jar"
         #:source-dir "jps/model-impl/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:tests? #f ;; TODO: implement additional modules required for the tests
+;;         #:test-dir "jps/model-impl/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "JetBrains Java Project System: Model implementation")
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
@@ -1196,8 +1269,15 @@
     (arguments
       `(#:jar-name "intellij-jps-model-impl.jar"
         #:source-dir "jps/model-impl/src"
-        #:tests? #f
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:tests? #f ;; TODO: implement additional modules required for the tests
+;;         #:test-dir "jps/model-impl/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "JetBrains Java Project System: Model implementation")
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
@@ -1239,7 +1319,7 @@
     (arguments
       `(#:jar-name "dart-ast.jar"
         #:source-dir "unzipped"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Vendored version dart-ast from the Kotlin source code")
@@ -1282,7 +1362,7 @@
     (arguments
       `(#:jar-name "dart-ast.jar"
         #:source-dir "unzipped"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Vendored version dart-ast from the Kotlin source code")
@@ -1325,7 +1405,7 @@
     (arguments
       `(#:jar-name "dart-ast.jar"
         #:source-dir "unzipped"
-        #:tests? #f
+        #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.7")))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "Vendored version dart-ast from the Kotlin source code")
@@ -1971,6 +2051,7 @@
              "-Dshrink=false"
              (string-append "-Dbuild.number=" #$version)
              (string-append "-Dbootstrap.compiler.home=" #$(this-package-native-input "kotlin"))
+             "-Dbootstrap.build.no.tests=true"
              "-verbose")
         #:tests? #f
         #:phases
