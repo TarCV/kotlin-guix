@@ -16,6 +16,26 @@
 ;; TODO: verify quasiquotes and other magic characters
 ;; TODO: should intellij packages be merged, or their patches be splitted?
 ;; TODO: compare dart sources with each other
+;; TODO: ensure (find-files "*.jar") finds only a single file
+
+(define (link-input-jars target-dir package-names)
+  `(lambda* (#:key inputs #:allow-other-keys)
+    (mkdir-p ,target-dir)
+    (for-each
+      (lambda (p)
+        (let*
+          ((allJars (find-files
+                      (assoc-ref inputs p)
+                      ;; Exclude javadoc and other variants
+                      "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+            (mainJar (if (= 1 (length allJars))
+                       (car allJars)
+                       (throw 'no-or-multiple-jars-found p))))
+
+          (symlink
+            mainJar
+            (string-append ,target-dir "/" (basename mainJar)))))
+      ,package-names)))
 
 (define ant-contrib
   (package
@@ -188,10 +208,10 @@
       ,@(package-arguments java-jetbrains-annotations)))))
 
 ;; IntelliJ 133 vendors ASM 4.0, but we need Java 8 support so use the first major version supporting it
-(define java-asm5
+(define java-jetbrains-asm5
   (package
     (inherit java-asm)
-    (name "java-asm5")
+    (name "java-jetbrains-asm5")
     (version "5.2")
     (source (origin
         (method git-fetch)
@@ -440,7 +460,12 @@
     (arguments
       `(#:jar-name "intellij-boot.jar"
         #:source-dir "platform/boot/src"
-        #:tests? #f))
+        #:tests? #f
+        #:phases
+         (modify-phases %standard-phases
+           (add-before 'build 'copy-metadata
+             (lambda _
+               (copy-recursively "platform/boot/src/META-INF" "build/classes/META-INF"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Boot")
     (description "IntelliJ Platform, boot submodule")
@@ -472,7 +497,12 @@
     (arguments
       `(#:jar-name "intellij-boot.jar"
         #:source-dir "platform/boot/src"
-        #:tests? #f))
+        #:tests? #f
+        #:phases
+         (modify-phases %standard-phases
+           (add-before 'build 'copy-metadata
+             (lambda _
+               (copy-recursively "platform/boot/src/META-INF" "build/classes/META-INF"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Platform: Boot")
     (description "IntelliJ Platform, boot submodule")
@@ -565,7 +595,7 @@
                 (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (propagated-inputs
-     (list java-asm5))
+     (list java-jetbrains-asm5))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
@@ -605,7 +635,7 @@
                 (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
             #t))))
     (propagated-inputs
-     (list java-asm5))
+     (list java-jetbrains-asm5))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "intellij-compiler-instrumentation-util.jar"
@@ -1059,6 +1089,76 @@
     (description "IntelliJ Java psi-api submodule")
     (license license:asl2.0)))
 
+(define intellij-project-api-134
+  (package
+    (name "intellij-project-api")
+    (version "134")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+              (file-name (string-append "intellij-community-" version ".tar.gz"))
+              (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+              (patches '("patches/sdk-134.patch"))
+              (modules '((guix build utils)))
+              (snippet
+                '(begin
+                   (delete-file-recursively "bin")
+                   (delete-file-recursively "lib")
+                   (delete-file-recursively "plugins")
+                   (delete-file-recursively "python")
+                   (for-each delete-file
+                     (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
+                   #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list intellij-core-api-134 intellij-jps-model-api-134))
+    (arguments
+      `(#:jar-name "intellij-java-impl.jar"
+         #:source-dir "platform/projectModel-api/src"
+         #:tests? #f ;; This module doesn't have tests
+         #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform - Project Model API")
+    (description "IntelliJ Platform: projectModel-api submodule")
+    (license license:asl2.0)))
+
+(define intellij-java-impl-134
+  (package
+    (name "intellij-java-impl")
+    (version "134")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+              (file-name (string-append "intellij-community-" version ".tar.gz"))
+              (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+              (patches '("patches/sdk-134.patch"))
+              (modules '((guix build utils)))
+              (snippet
+                '(begin
+                   (delete-file-recursively "bin")
+                   (delete-file-recursively "lib")
+                   (delete-file-recursively "plugins")
+                   (delete-file-recursively "python")
+                   (for-each delete-file
+                     (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
+                   #t))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list java-jetbrains-annotations))
+    (propagated-inputs
+      (list intellij-project-api-134 intellij-core-api-134))
+    (arguments
+      `(#:jar-name "intellij-java-impl.jar"
+         #:source-dir "java/java-impl/src/com/intellij/psi/impl/compiled"
+         #:tests? #f ;; This module doesn't have tests
+         #:make-flags (list "-Dant.build.javac.target=1.7")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Java routines")
+    (description "IntelliJ Java java-impl submodule")
+    (license license:asl2.0)))
+
 (define-public intellij-java-psi-impl-133
   (package
     (name "intellij-java-psi-impl")
@@ -1083,12 +1183,18 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list java-asm5 intellij-core-impl-133 intellij-java-psi-api-133))
+      (list java-jetbrains-asm5 intellij-core-impl-133 intellij-java-psi-api-133))
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
         #:tests? #f ;; This module doesn't have tests
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'copy-messages
+            (lambda _
+              (mkdir-p "build/classes/messages")
+              (copy-recursively "java/java-psi-impl/src/messages" "build/classes/messages"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Java PSI implementation")
     (description "IntelliJ Java psi-impl submodule")
@@ -1118,12 +1224,18 @@
     (native-inputs
       (list java-jetbrains-annotations))
     (propagated-inputs
-      (list java-asm5 intellij-core-impl-134 intellij-java-psi-api-134))
+      (list java-jetbrains-asm5 intellij-core-impl-134 intellij-java-psi-api-134))
     (arguments
       `(#:jar-name "intellij-java-psi-impl.jar"
         #:source-dir "java/java-psi-impl/src"
         #:tests? #f ;; This module doesn't have tests
-        #:make-flags (list "-Dant.build.javac.target=1.7")))
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'copy-messages
+            (lambda _
+              (mkdir-p "build/classes/messages")
+              (copy-recursively "java/java-psi-impl/src/messages" "build/classes/messages"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "IntelliJ Java PSI implementation")
     (description "IntelliJ Java psi-impl submodule")
@@ -1235,7 +1347,10 @@
           (add-before 'build 'fix-test-target
             (lambda _
               (substitute* "build.xml"
-                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
+                (("\\$\\{test\\.home\\}/java") "${test.home}"))))
+          (add-before 'build 'copy-metadata
+            (lambda _
+              (copy-recursively "jps/model-impl/src/META-INF" "build/classes/META-INF"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "JetBrains Java Project System: Model implementation")
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
@@ -1277,10 +1392,90 @@
           (add-before 'build 'fix-test-target
             (lambda _
               (substitute* "build.xml"
-                (("\\$\\{test\\.home\\}/java") "${test.home}")))))))
+                (("\\$\\{test\\.home\\}/java") "${test.home}"))))
+          (add-before 'build 'copy-metadata
+            (lambda _
+              (copy-recursively "jps/model-impl/src/META-INF" "build/classes/META-INF"))))))
     (home-page "https://www.jetbrains.com/opensource/idea/")
     (synopsis "JetBrains Java Project System: Model implementation")
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
+    (license license:asl2.0)))
+
+(define intellij-core-kotlin-134
+  (package
+    (name "intellij-core-kotlin")
+    (version "134")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/1168c7b8cb4dc8318b8d24037b372141730a0d1f.tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0gw1iihch2hbh61fskp7vqbj7s37z5f19jiaiqxb7wxc2w90cxyz"))
+        (patches '("patches/sdk-134.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+            (delete-file-recursively "bin")
+            (delete-file-recursively "lib")
+            (delete-file-recursively "plugins")
+            (delete-file-recursively "python")
+            (for-each delete-file
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$"))
+            #t))))
+    (native-inputs
+      (list unzip))
+    (propagated-inputs
+      (list java-javax-inject intellij-compiler-javac2-134 intellij-java-psi-impl-134 intellij-jps-model-impl-134))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-core.jar"
+        #:source-dir "empty-src-dir" ;; just jar existing compiled classes, no sources needed
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.7")
+        #:phases
+        ,#~(modify-phases %standard-phases
+          (add-before 'build 'create-empty-src-dir
+            (lambda _
+              (mkdir-p "empty-src-dir")))
+;          (add-after 'build 'crash
+;            (lambda _
+;              (invoke "jklfsdfsdfsd")))
+          (add-before 'build 'unzip-jars
+            (lambda* (#:key inputs #:allow-other-keys)
+              (mkdir-p "build/classes")
+              (for-each
+                (lambda (p)
+                  (let
+                    ((jars (find-files
+                              (assoc-ref inputs p)
+                              ;; Exclude javadoc and other variants
+                              "([[:digit:]]|^[^[:digit:]]+)\\.jar$")))
+
+                      (invoke (string-append #$unzip "/bin/unzip")
+                        (if (= 1 (length jars))
+                            (car jars)
+                            (throw 'multiple-jars-found p))
+                        "-d"
+                        "build/classes"
+                        ;; These files are generated by 'jar' target for each jar file it creates
+                        "-x"
+                        "META-INF/INDEX.LIST"
+                        "META-INF/MANIFEST.MF")))
+                (list
+                  "java-jdom"
+                  "java-javax-inject"
+
+                  "intellij-core-api"
+                  "intellij-core-impl"
+                  "intellij-extensions"
+                  "intellij-java-psi-api"
+                  "intellij-java-psi-impl"
+                  "intellij-jps-model-api"
+                  "intellij-jps-model-impl"
+                  "intellij-util"
+                  "intellij-util-rt")))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ platform: parts required for kotlin")
+    (description "This package provides an uberjar consisting of minimal set of modules needed for compiling kotlinc and standard libraries.")
     (license license:asl2.0)))
 
 (define-public kotlin-dart-ast-0.6.786
@@ -1470,21 +1665,25 @@
                 (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
-                    (for-each
-                      (lambda (f)
+                    (let*
+                      ((allJars (find-files
+                                (assoc-ref inputs p)
+                                ;; Exclude javadoc and other variants
+                               "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                        (mainJar (if (= 1 (length allJars))
+                                   (car allJars)
+                                   (throw 'no-or-multiple-jars-found p))))
+
                         (symlink
-                          f
-                          (string-append "ideaSDK/core/" (basename f))))
-                      (find-files
-                        (assoc-ref inputs p)
-                        "\\.jar$")))
+                          mainJar
+                          (string-append "ideaSDK/core/" (basename mainJar)))))
                   (list
                     "java-cli-parser"
                     "java-jdom"
                     "java-guava"
                     "java-javax-inject"
                     "java-jetbrains-annotations"
-                    "java-asm5"
+                    "java-jetbrains-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1512,7 +1711,7 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "java-asm5")
+                    (assoc-ref inputs "java-jetbrains-asm5")
                     "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
@@ -1588,14 +1787,18 @@
                 (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
-                    (for-each
-                      (lambda (f)
-                        (symlink
-                          f
-                          (string-append "ideaSDK/core/" (basename f))))
-                      (find-files
+                    (let*
+                      ((allJars (find-files
                         (assoc-ref inputs p)
-                        "\\.jar$")))
+                                  ;; Exclude javadoc and other variants
+                                  "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                        (mainJar (if (= 1 (length allJars))
+                                   (car allJars)
+                                   (throw 'no-or-multiple-jars-found p))))
+
+                      (symlink
+                        mainJar
+                        (string-append "ideaSDK/core/" (basename mainJar)))))
                   (list
                     "java-cli-parser"
                     "java-jdom"
@@ -1603,7 +1806,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "java-asm5"
+                    "java-jetbrains-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1631,7 +1834,7 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "java-asm5")
+                    (assoc-ref inputs "java-jetbrains-asm5")
                     "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
@@ -1709,14 +1912,18 @@
                 (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
-                    (for-each
-                      (lambda (f)
+                    (let*
+                      ((allJars (find-files
+                                  (assoc-ref inputs p)
+                                  ;; Exclude javadoc and other variants
+                                  "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                        (mainJar (if (= 1 (length allJars))
+                                   (car allJars)
+                                   (throw 'no-or-multiple-jars-found p))))
+
                         (symlink
-                          f
-                          (string-append "ideaSDK/core/" (basename f))))
-                      (find-files
-                        (assoc-ref inputs p)
-                        "\\.jar$")))
+                        mainJar
+                        (string-append "ideaSDK/core/" (basename mainJar)))))
                   (list
                     "java-cli-parser"
                     "java-jdom"
@@ -1724,7 +1931,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "java-asm5"
+                    "java-jetbrains-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1760,7 +1967,7 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "java-asm5")
+                    (assoc-ref inputs "java-jetbrains-asm5")
                     "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
@@ -1837,14 +2044,18 @@
                 (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
-                    (for-each
-                      (lambda (f)
+                    (let*
+                      ((allJars (find-files
+                                  (assoc-ref inputs p)
+                                  ;; Exclude javadoc and other variants
+                                  "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                        (mainJar (if (= 1 (length allJars))
+                                   (car allJars)
+                                   (throw 'no-or-multiple-jars-found p))))
+
                         (symlink
-                          f
-                          (string-append "ideaSDK/core/" (basename f))))
-                      (find-files
-                        (assoc-ref inputs p)
-                        "\\.jar$")))
+                        mainJar
+                        (string-append "ideaSDK/core/" (basename mainJar)))))
                   (list
                     "java-cli-parser"
                     "java-jdom"
@@ -1852,7 +2063,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "java-asm5"
+                    "java-jetbrains-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -1881,7 +2092,7 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "java-asm5")
+                    (assoc-ref inputs "java-jetbrains-asm5")
                     "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
@@ -1961,14 +2172,18 @@
                 (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
-                    (for-each
-                      (lambda (f)
-                        (symlink
-                          f
-                          (string-append "ideaSDK/core/" (basename f))))
-                      (find-files
+                    (let*
+                      ((allJars (find-files
                         (assoc-ref inputs p)
-                        "\\.jar$")))
+                                  ;; Exclude javadoc and other variants
+                                  "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                        (mainJar (if (= 1 (length allJars))
+                                   (car allJars)
+                                   (throw 'no-or-multiple-jars-found p))))
+
+                      (symlink
+                        mainJar
+                        (string-append "ideaSDK/core/" (basename mainJar)))))
                   (list
                     "java-cli-parser"
                     "java-jdom"
@@ -1976,7 +2191,7 @@
                     "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "java-asm5"
+                    "java-jetbrains-asm5"
                     "intellij-core-api"
                     "intellij-core-impl"
                     "intellij-extensions"
@@ -2005,7 +2220,7 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "java-asm5")
+                    (assoc-ref inputs "java-jetbrains-asm5")
                     "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
@@ -2040,7 +2255,7 @@
         (snippet `(for-each delete-file
             (find-files "." ".*\\.jar$")))))
     (native-inputs
-      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-134 intellij-java-psi-impl-134 intellij-jps-model-impl-134 icedtea-7 kotlin-0.6.2338))
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-20 java-javax-inject java-jetbrains-annotations-java7 java-protobuf-api-2.5 intellij-compiler-javac2-134 intellij-core-kotlin-134 intellij-jps-model-impl-134 icedtea-7 kotlin-0.6.2338))
     (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
     (build-system ant-build-system)
     (arguments
@@ -2086,33 +2301,27 @@
                 (mkdir-p "ideaSDK/core")
                 (for-each
                   (lambda (p)
-                    (for-each
-                      (lambda (f)
-                        (symlink
-                          f
-                          (string-append "ideaSDK/core/" (basename f))))
-                      (find-files
+                    (let*
+                      ((allJars (find-files
                         (assoc-ref inputs p)
-                        "\\.jar$")))
+                                  ;; Exclude javadoc and other variants
+                                  "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                        (mainJar (if (= 1 (length allJars))
+                                   (car allJars)
+                                   (throw 'no-or-multiple-jars-found p))))
+
+                      (symlink
+                        mainJar
+                        (string-append "ideaSDK/core/" (basename mainJar)))))
                   (list
                     "java-cli-parser"
-                    "java-jdom"
                     "java-guava"
-                    "java-javax-inject"
                     "java-jetbrains-annotations"
                     "java-log4j-1.2-api"
-                    "java-asm5"
-                    "intellij-core-api"
-                    "intellij-core-impl"
-                    "intellij-extensions"
-                    "intellij-java-psi-api"
-                    "intellij-java-psi-impl"
-                    "intellij-jps-model-impl"
+                    "java-jetbrains-asm5"
+                    "intellij-core-kotlin"
                     "java-picocontainer"
-                    "java-jetbrains-trove4j"
-                    "intellij-util"
-                    "intellij-util-rt"
-                  ))
+                    "java-jetbrains-trove4j"))
 
                 (mkdir-p "ideaSDK/jps")
                 (symlink
@@ -2130,7 +2339,7 @@
                   "ideaSDK/lib/javac2.jar")
                 (symlink
                   (string-append
-                    (assoc-ref inputs "java-asm5")
+                    (assoc-ref inputs "java-jetbrains-asm5")
                     "/lib/m2/org/ow2/asm/asm/6.0/asm-6.0.jar")
                   "ideaSDK/lib/jetbrains-asm-debug-all-4.0.jar")
                 (symlink
