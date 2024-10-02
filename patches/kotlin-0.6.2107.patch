@@ -45,34 +45,3 @@ index bd04e0c8a2b..0bec7ce86fa 100644
  
  fun JetBlockExpression.appendElement(element: JetElement): JetElement =
          addAfter(element, getRBrace()!!.getPrevSibling()!!)!! as JetElement
---- a/build-tools/ant/src/org/jetbrains/jet/buildtools/ant/KotlinCompilerAdapter.java
-+++ b/build-tools/ant/src/org/jetbrains/jet/buildtools/ant/KotlinCompilerAdapter.java
-@@ -29,6 +29,7 @@
-         BytecodeCompilerTask kotlinTask = new BytecodeCompilerTask();
-         kotlinTask.setOutput(javac.getDestdir());
-         kotlinTask.setClasspath(javac.getClasspath());
-+        org.jetbrains.jet.utils.PathUtil.setRtJar(javac.getBootclasspath().toString());
-         kotlinTask.setSrc(javac.getSrcdir());
-
-         kotlinTask.execute();
---- a/compiler/util/src/org/jetbrains/jet/utils/PathUtil.java
-+++ b/compiler/util/src/org/jetbrains/jet/utils/PathUtil.java
-@@ -40,5 +40,7 @@
-     private static final File NO_PATH = new File("<no_path>");
-+    private static String rtJarPath = null;
-+    public static synchronized void setRtJar(String path) { rtJarPath = path; }
-
-     private PathUtil() {}
-
-     @NotNull
-@@ -156,7 +158,8 @@
-     }
-
-     @NotNull
--    public static List<File> getJdkClassesRoots() {
-+    public static synchronized List<File> getJdkClassesRoots() {
-+        File javaPath = (rtJarPath != null) ? new File(rtJarPath).getParentFile().getParentFile() : new File(System.getProperty("java.home"));
--        return JavaSdkUtil.getJdkClassesRoots(new File(System.getProperty("java.home")), true);
-+        return JavaSdkUtil.getJdkClassesRoots(javaPath, true);
-     }
- }

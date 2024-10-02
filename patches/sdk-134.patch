@@ -486,14 +486,17 @@ index 8e6bdbcfa226..3e99367cf8ac 100644
 +      list.add(new SoftReference<byte[]>(new byte[(int)Math.min(Runtime.getRuntime().freeMemory() / 2, Integer.MAX_VALUE)]));
      }
    }
---- /dev/null
-+++ b/resources-kotlin/src/META-INF/IdeaPlugin.xml
-@@ -0,0 +0,8 @@
-+<idea-plugin version="2" xmlns:xi="http://www.w3.org/2001/XInclude">
-+  <!-- Minimal configuration required to compile kotlin -->
-+  <id>com.intellij</id>
-+  <name>IDEA CORE</name>
-+  <extensionPoints>
-+    <extensionPoint name="psi.classFileDecompiler" interface="com.intellij.psi.compiled.ClassFileDecompilers$Decompiler"/>
-+  </extensionPoints>
-+</idea-plugin>
+--- a/java/java-psi-api/src/com/intellij/psi/compiled/ClassFileDecompilers.java
++++ b/java/java-psi-api/src/com/intellij/psi/compiled/ClassFileDecompilers.java
+@@ -85,10 +85,6 @@
+   @Nullable
+   public static Decompiler find(@NotNull VirtualFile file) {
++    // Extensions subsystem is not loaded in guix build of Kotlin, and there is no decompilers registered by default anyway
+-    for (Decompiler decompiler : EP_NAME.getExtensions()) {
+-      if ((decompiler instanceof Light || decompiler instanceof Full) && decompiler.accepts(file)) {
+-        return decompiler;
+-      }
+-    }
+
+     return null;
+   }
