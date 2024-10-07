@@ -1,0 +1,15 @@
+--- a/guava/src/com/google/common/collect/Sets.java
++++ b/guava/src/com/google/common/collect/Sets.java
+@@ -292,6 +292,12 @@
+     return new LinkedHashSet<E>();
+   }
+
++  public static <E> HashSet<E> newLinkedHashSet(E... elements) {
++    HashSet<E> set = newLinkedHashSetWithExpectedSize(elements.length);
++    Collections.addAll(set, elements);
++    return set;
++  }
++
+   /**
+    * Creates a {@code LinkedHashSet} instance, with a high enough "initial capacity" that it
+    * <i>should</i> hold {@code expectedSize} elements without growth. This behavior cannot be

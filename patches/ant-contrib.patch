@@ -39,6 +39,14 @@
  				<pathelement location="${target.classes.dir}" />
  			</classpath>
  		</javac>
+@@ -100,7 +100,6 @@
+ 		<jar file="${target.dir}/${jar.name}">
+ 			<manifest>
+                 <attribute name="Version" value="${project.version}"/>
+-                <attribute name="Build-Timestamp" value="${tstamp}"/>
+ 			</manifest>
+ 			<fileset dir="${target.classes.dir}" />
+ 		</jar>
 @@ -113,14 +113,13 @@
  		</delete>
  	</target>
@@ -52,7 +60,7 @@
  	             version="true"
 -	             windowtitle="Ant Contrib"
 -	    	classpathref="compile.classpath">
-+	             windowtitle="Ant Contrib">
++	             windowtitle="Ant Contrib" additionalparam="-notimestamp">
  	      <tag name="ant.task" enabled="false" description="Task:" scope="types"/>
  	      <tag name="ant.datatype" enabled="false"
  	           description="Data type:" scope="types"/>

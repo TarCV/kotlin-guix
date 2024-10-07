@@ -585,17 +585,6 @@ index d65a00d165de..56b7ab22ec95 100644
    }
 
    public Self and(final ElementPattern pattern) {
---- a/java/compiler/instrumentation-util/src/com/intellij/compiler/instrumentation/InstrumentationClassFinder.java
-+++ b/java/compiler/instrumentation-util/src/com/intellij/compiler/instrumentation/InstrumentationClassFinder.java
-@@ -120,7 +120,7 @@
-       final PseudoClass result = loadPseudoClass(is);
-       myLoaded.put(internalName, result);
-       return result;
--    }
-+    } catch (Throwable t) { throw new RuntimeException("Exception in loadClass(\"" + internalName + "\")", t); }
-     finally {
-       is.close();
-     }
 --- a/platform/extensions/testSrc/com/intellij/openapi/extensions/impl/LoadingOrderTest.java
 +++ b/platform/extensions/testSrc/com/intellij/openapi/extensions/impl/LoadingOrderTest.java
 @@ -19,6 +19,6 @@
@@ -659,3 +648,68 @@ index d65a00d165de..56b7ab22ec95 100644
 +      list.add(new SoftReference<byte[]>(new byte[(int)Math.min(Runtime.getRuntime().freeMemory() / 2, Integer.MAX_VALUE)]));
      }
    }
+--- a/platform/util/testSrc/com/intellij/util/text/DateFormatUtilTest.java
++++ b/platform/util/testSrc/com/intellij/util/text/DateFormatUtilTest.java
+@@ -84,7 +84,7 @@
+     return new GregorianCalendar(year, month - 1, day, hour, minute, second).getTime();
+   }
+
+-  public void testConvertingMacToJavaPattern() throws Throwable {
++  private void convertingMacToJavaPattern() throws Throwable {
+     Clock.setTime(date(2004, 2, 5, 16, 6, 7).getTime() + 8);
+
+     String mon = new SimpleDateFormat("MMM").format(Clock.getTime());
+--- a/platform/util/testSrc/com/intellij/util/xmlb/XmlSerializerTest.java
++++ b/platform/util/testSrc/com/intellij/util/xmlb/XmlSerializerTest.java
+@@ -988,7 +988,8 @@
+   }
+
+   public static class BeanWithSetKeysInMap {
+-    public Map<Collection<String>, String> myMap = new HashMap<Collection<String>, String>();
++    // LinkedHashMap guarantees insertion order for keySet
++    public Map<Collection<String>, String> myMap = new LinkedHashMap<Collection<String>, String>();
+   }
+
+   public void testSetKeysInMap() {
+@@ -1000,21 +1001,21 @@
+       "<BeanWithSetKeysInMap>\n" +
+       "  <option name=\"myMap\">\n" +
+       "    <map>\n" +
+-      "      <entry value=\"letters\">\n" +
++      "      <entry value=\"numbers\">\n" +
+       "        <key>\n" +
+       "          <set>\n" +
+-      "            <option value=\"a\" />\n" +
+-      "            <option value=\"b\" />\n" +
+-      "            <option value=\"c\" />\n" +
++      "            <option value=\"1\" />\n" +
++      "            <option value=\"2\" />\n" +
++      "            <option value=\"3\" />\n" +
+       "          </set>\n" +
+       "        </key>\n" +
+       "      </entry>\n" +
+-      "      <entry value=\"numbers\">\n" +
++      "      <entry value=\"letters\">\n" +
+       "        <key>\n" +
+       "          <set>\n" +
+-      "            <option value=\"1\" />\n" +
+-      "            <option value=\"2\" />\n" +
+-      "            <option value=\"3\" />\n" +
++      "            <option value=\"a\" />\n" +
++      "            <option value=\"b\" />\n" +
++      "            <option value=\"c\" />\n" +
+       "          </set>\n" +
+       "        </key>\n" +
+       "      </entry>\n" +
+--- a/platform/util-rt/src/com/intellij/util/containers/LinkedHashMap.java
++++ b/platform/util-rt/src/com/intellij/util/containers/LinkedHashMap.java
+@@ -17,7 +17,8 @@
+ import java.util.Map;
+
+ @SuppressWarnings("ClassNameSameAsAncestorName")
+-class LinkedHashMap<K, V> extends java.util.LinkedHashMap<K, V> {
++// Open the class for used in Kotlin compiler to fix non-deterministic bytecode generation
++public class LinkedHashMap<K, V> extends java.util.LinkedHashMap<K, V> {
+   public LinkedHashMap() { }
+
+   public LinkedHashMap(int i, float v) {

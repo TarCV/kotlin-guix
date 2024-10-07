@@ -500,3 +500,45 @@ index 8e6bdbcfa226..3e99367cf8ac 100644
 
      return null;
    }
+--- a/platform/util/testSrc/com/intellij/util/xmlb/XmlSerializerTest.java
++++ b/platform/util/testSrc/com/intellij/util/xmlb/XmlSerializerTest.java
+@@ -988,7 +988,8 @@
+   }
+
+   public static class BeanWithSetKeysInMap {
+-    public Map<Collection<String>, String> myMap = new HashMap<Collection<String>, String>();
++    // LinkedHashMap guarantees insertion order for keySet
++    public Map<Collection<String>, String> myMap = new LinkedHashMap<Collection<String>, String>();
+   }
+
+   public void testSetKeysInMap() {
+@@ -1000,21 +1001,21 @@
+       "<BeanWithSetKeysInMap>\n" +
+       "  <option name=\"myMap\">\n" +
+       "    <map>\n" +
+-      "      <entry value=\"letters\">\n" +
++      "      <entry value=\"numbers\">\n" +
+       "        <key>\n" +
+       "          <set>\n" +
+-      "            <option value=\"a\" />\n" +
+-      "            <option value=\"b\" />\n" +
+-      "            <option value=\"c\" />\n" +
++      "            <option value=\"1\" />\n" +
++      "            <option value=\"2\" />\n" +
++      "            <option value=\"3\" />\n" +
+       "          </set>\n" +
+       "        </key>\n" +
+       "      </entry>\n" +
+-      "      <entry value=\"numbers\">\n" +
++      "      <entry value=\"letters\">\n" +
+       "        <key>\n" +
+       "          <set>\n" +
+-      "            <option value=\"1\" />\n" +
+-      "            <option value=\"2\" />\n" +
+-      "            <option value=\"3\" />\n" +
++      "            <option value=\"a\" />\n" +
++      "            <option value=\"b\" />\n" +
++      "            <option value=\"c\" />\n" +
+       "          </set>\n" +
+       "        </key>\n" +
+       "      </entry>\n" +

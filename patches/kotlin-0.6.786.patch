@@ -58,3 +58,5 @@ index 00000000000..1cfe75cb242
 +public @interface KotlinTraitImpl {
 +    int abiVersion();
 +}
+--- a/js/js.translator/src/org/jetbrains/k2js/translate/reference/InlinedCallExpressionTranslator.java
++++ b/js/js.translator/src/org/jetbrains/k2js/translate/reference/InlinedCallExpressionTranslator.java

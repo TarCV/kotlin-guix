@@ -11,12 +11,21 @@ index 25eeb38c3bc..516ce5d97a5 100644
          </path>
          <taskdef name="javac2" classname="com.intellij.ant.Javac2" classpathref="javac2.classpath"/>
          <echo message="Use javac2 from Idea lib"/>
+@@ -323,7 +323,7 @@
+           <if>
+             <istrue value="${bootstrap.build.no.tests}"/>
+             <then>
+-              <property name="compiler.manifest.class.path" value="."/>
++              <property name="compiler.manifest.class.path" value=""/>
+             </then>
+             <else>
+               <property name="compiler.manifest.class.path" value="kotlin-runtime.jar"/>
 @@ -613,7 +613,7 @@
  
      <!-- builds redistributables from sources -->
      <target name="dist"
 -            depends="clean,init,prepareDist,preloader,builtins,compiler,compilerSources,antTools,jdkAnnotations,androidSdkAnnotations,runtime,runtime_sources,jslib"/>
-+            depends="clean,init,prepareDist,preloader,builtins,compiler,compilerSources,antTools,jdkAnnotations,androidSdkAnnotations,runtime,runtime_sources"/>
++            depends="clean,init,prepareDist,preloader,builtins,compiler,compilerSources,antTools,jdkAnnotations,runtime,runtime_sources"/>
  
      <!-- builds everything, but classes are reused from project out dir, doesn't run proguard and javadoc -->
      <target name="dist_quick"

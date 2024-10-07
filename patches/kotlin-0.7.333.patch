@@ -7,7 +7,7 @@ index ead08ac7288..d0008227890 100644
              <istrue value="${bootstrap.build.no.tests}"/>
              <then>
 -              <property name="compiler.manifest.class.path" value="."/>
-+              <property name="compiler.manifest.class.path" value="./"/>
++              <property name="compiler.manifest.class.path" value=""/>
              </then>
              <else>
                <property name="compiler.manifest.class.path" value="kotlin-runtime.jar"/>
