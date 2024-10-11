@@ -3231,7 +3231,11 @@
   (kotlin-like-0.8.84-variants "0.8.84" "0bmdvnj9bz0d8bfj8rwk6rjdy9bi5g5mcfji0lxy5w5rx7rsmsjj" #t kotlin-0.7.1214-bootstrap))
 (define kotlin-0.8.409-bootstrap
   (kotlin-like-0.8.84-variants "0.8.409" "1lgxil6w68761nm4yh3irismmb0c0xpyalygg4svwnx5xd368k81" #t kotlin-0.8.84-bootstrap))
-;(define kotlin-0.8.418-bootstrap
-;  (kotlin-like-0.8.84-variants "0.8.418" "0gf8l9asfrwhl67ysw1c71wmp8acb7l2j41lb97l8scbwl2lvnn9" #t kotlin-0.8.409-bootstrap))
+(define kotlin-0.8.418-bootstrap
+  (kotlin-like-0.8.84-variants "0.8.418" "0gf8l9asfrwhl67ysw1c71wmp8acb7l2j41lb97l8scbwl2lvnn9" #t kotlin-0.8.409-bootstrap))
+(define kotlin-0.8.422-bootstrap
+  (kotlin-like-0.8.84-variants "0.8.422" "0drjphsr54ly5s0p5ix7ra4npx9gsa8m3alq54qqh4kaxz1r9q78" #t kotlin-0.8.418-bootstrap))
+(define kotlin-0.8.1444-bootstrap
+  (kotlin-like-0.8.84-variants "0.8.1444" "08hb29909gglyq2l3jz8cs80qkqcdk23f8i2fww93df7qvil8mrp" #t kotlin-0.8.422-bootstrap))
 
-kotlin-0.8.409-bootstrap
+kotlin-0.8.1444-bootstrap
