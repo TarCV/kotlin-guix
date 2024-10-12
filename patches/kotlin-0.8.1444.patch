@@ -53,7 +53,7 @@ index 40b37f52d5a..993e0dac1f0 100644
                  String fieldName = ((FieldOwnerContext) context.getParentContext()).getFieldName(propertyDescriptor, false);
                  iv.getfield(classAsmType.getInternalName(), fieldName, type.getDescriptor());
 -                return type.getReturnType();
-+                String descriptor = type.getDescriptor(); return (descriptor.contains(")") ? type.getReturnType() : Type.getType(descriptor));
++                String descriptor = type.getDescriptor(); if (descriptor.contains(")")) { throw new IllegalStateException(descriptor); } else { return Type.getType(descriptor); }
              }
              else {
                  //noinspection ConstantConditions

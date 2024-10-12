@@ -466,6 +466,18 @@ index 8e6bdbcfa226..3e99367cf8ac 100644
          result.add(target);
 
        }
+--- a/platform/util-rt/src/com/intellij/util/containers/LinkedHashMap.java
++++ b/platform/util-rt/src/com/intellij/util/containers/LinkedHashMap.java
+@@ -17,7 +17,8 @@
+ import java.util.Map;
+
+ @SuppressWarnings("ClassNameSameAsAncestorName")
+-class LinkedHashMap<K, V> extends java.util.LinkedHashMap<K, V> {
++// Open the class for use in Kotlin compiler to fix non-deterministic bytecode generation
++public class LinkedHashMap<K, V> extends java.util.LinkedHashMap<K, V> {
+   public LinkedHashMap() { }
+
+   public LinkedHashMap(int i, float v) {
 --- a/platform/extensions/testSrc/com/intellij/openapi/extensions/impl/LoadingOrderTest.java
 +++ b/platform/extensions/testSrc/com/intellij/openapi/extensions/impl/LoadingOrderTest.java
 @@ -19,6 +19,6 @@
