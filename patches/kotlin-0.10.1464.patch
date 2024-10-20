@@ -1,8 +1,8 @@
 diff --git a/build.xml b/build.xml
-index c3ecb385413..fdf8b3a0842 100644
+index ca883bdc774..824315217ad 100644
 --- a/build.xml
 +++ b/build.xml
-@@ -877,7 +877,7 @@
+@@ -857,7 +857,7 @@
              <jar-content>
                  <fileset dir="${output}/classes/reflection"/>
                  <fileset dir="${output}/classes/core"/>
@@ -12,44 +12,44 @@ index c3ecb385413..fdf8b3a0842 100644
 +                <zipfileset src="${javax.inject.jar}" excludes="META-INF/INDEX.LIST"/>
              </jar-content>
          </pack-runtime-jar>
-@@ -900,7 +900,7 @@
+@@ -892,7 +892,7 @@
              depends="builtins,stdlib,core,reflection,pack-runtime,pack-runtime-sources"/>
  
      <target name="dist"
 -            depends="clean,init,prepare-dist,preloader,serialize-builtins,compiler,compiler-sources,ant-tools,jdk-annotations,android-sdk-annotations,runtime,kotlin-js-stdlib,android-compiler-plugin"
-+            depends="clean,init,prepare-dist,preloader,serialize-builtins,compiler,compiler-sources,ant-tools,jdk-annotations,runtime,android-compiler-plugin"
++            depends="clean,init,prepare-dist,preloader,serialize-builtins,compiler,compiler-sources,ant-tools,jdk-annotations,runtime"
              description="Builds redistributables from sources"/>
  
      <target name="dist-quick"
 diff --git a/libraries/stdlib/src/kotlin/io/ReadWrite.kt b/libraries/stdlib/src/kotlin/io/ReadWrite.kt
-index 3cb40161d7c..eb4550c136b 100644
+index 3de5e5d4100..d1309910f29 100644
 --- a/libraries/stdlib/src/kotlin/io/ReadWrite.kt
 +++ b/libraries/stdlib/src/kotlin/io/ReadWrite.kt
-@@ -235,7 +235,7 @@ public fun Reader.forEachLine(block: (String) -> Unit): Unit = useLines { it.for
+@@ -159,7 +159,7 @@ public fun Reader.forEachLine(block: (String) -> Unit): Unit = useLines { lines
   * @return the value returned by [block].
   */
  public inline fun <T> Reader.useLines(block: (Sequence<String>) -> T): T =
--        buffered().use { block(it.lines()) }
-+        buffered().use { block(it.lineSequence()) }
+-        this.buffered().use { block(it.lines()) }
++        this.buffered().use { block(it.lineSequence()) }
  
  /**
-  * Returns a sequence of corresponding file lines
-@@ -248,10 +248,10 @@ public inline fun <T> Reader.useLines(block: (Sequence<String>) -> T): T =
+  * Returns an iterator over each line.
+@@ -169,10 +169,10 @@ public inline fun <T> Reader.useLines(block: (Sequence<String>) -> T): T =
   *
-  * @return a sequence of corresponding file lines. The sequence returned can be iterated only once.
+  * We suggest you try the method [useLines] instead which closes the stream when the processing is complete.
   */
--public fun BufferedReader.lines(): Sequence<String> = LinesSequence(this).constrainOnce()
-+public fun BufferedReader.lineSequence(): Sequence<String> = LinesSequence(this).constrainOnce()
+-public fun BufferedReader.lines(): Sequence<String> = LinesStream(this)
++public fun BufferedReader.lineSequence(): Sequence<String> = LinesStream(this)
  
- deprecated("Use lines() function which returns Sequence<String>")
+ deprecated("Use lines() function which returns Stream<String>")
 -public fun BufferedReader.lineIterator(): Iterator<String> = lines().iterator()
 +public fun BufferedReader.lineIterator(): Iterator<String> = lineSequence().iterator()
  
- private class LinesSequence(private val reader: BufferedReader) : Sequence<String> {
-     override public fun iterator(): Iterator<String> {
+ private class LinesStream(private val reader: BufferedReader) : Sequence<String> {
+     override fun iterator(): Iterator<String> {
 --- a/compiler/backend/src/org/jetbrains/kotlin/codegen/ImplementationBodyCodegen.java
 +++ b/compiler/backend/src/org/jetbrains/kotlin/codegen/ImplementationBodyCodegen.java
-@@ -677,7 +677,7 @@ private Type genPropertyOnStack(InstructionAdapter iv, MethodContext context, PropertyDescriptor propertyDescriptor, int index) {
+@@ -694,7 +694,7 @@ private Type genPropertyOnStack(InstructionAdapter iv, MethodContext context, PropertyDescriptor propertyDescriptor, int index) {
                  Type type = typeMapper.mapType(propertyDescriptor.getType());
                  String fieldName = ((FieldOwnerContext) context.getParentContext()).getFieldName(propertyDescriptor, false);
                  iv.getfield(classAsmType.getInternalName(), fieldName, type.getDescriptor());

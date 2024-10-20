@@ -25,6 +25,7 @@
 ;; TODO: delete unused sources before building
 ;; TODO: try using just the latest intellij, asm, annotations versions
 ;; TODO: avoid using Java 7+ features in public kotlin packages
+;; TODO: why building the same packages leads to different results before and after reboot?
 
 (define (link-input-jars target-dir package-names)
   `(lambda* (#:key inputs #:allow-other-keys)
@@ -4184,6 +4185,324 @@
     (description "Kotlin programming language")
     (license license:asl2.0)))
 
+(define (kotlin-like-0.10.1426-variants version sha256sum build-for-bootstrapping bootstrap-package)
+  (package
+    (name "kotlin")
+    (version version)
+    (source (origin
+              (method git-fetch)
+              (uri (git-reference
+                     (url "https://github.com/JetBrains/kotlin.git")
+                     (commit (string-append "build-" version))))
+              (file-name (git-file-name name version))
+              (sha256 (base32 sha256sum))
+              (patches `(,(string-append "patches/kotlin-" version ".patch")))
+              (modules '((guix build utils)))
+              (snippet `(for-each delete-file
+                          (find-files "." ".*\\.(a|class|exe|jar|so|zip)$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-patched-20 java-javax-inject-java6
+            java-protobuf-api-2.5 intellij-annotations-141 intellij-compiler-javac2-141 intellij-core-kotlin-141
+            intellij-jps-model-impl-141 kotlin-jdk-annotations-patched))
+    (inputs '())
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+         #:jdk ,icedtea-7
+         #:make-flags
+         ,#~(list (string-append "-Dkotlin-home=" #$output)
+                  (if #$build-for-bootstrapping "-Dbootstrap.build.no.tests=true" "")
+                  "-Dgenerate.javadoc=false"
+                  "-Dshrink=false"
+                  (string-append "-Dbuild.number=" #$version)
+                  (string-append "-Dbootstrap.compiler.home=" #$bootstrap-package))
+         #:tests? #f
+         #:phases
+         ,#~(modify-phases %standard-phases
+           (add-before 'build 'fix-value-order
+             ;; fix non-determenistic bytecode generation caused by random iteration order of basic hash maps and sets
+             (lambda _
+               (with-fluids ((%default-port-encoding "ISO-8859-1"))
+                 (substitute* (find-files "." "\\.(java|kt)$")
+                   (("([^_[:alnum:]]|new)Hash(Map|Set)" all prefix suffix) (string-append prefix "LinkedHash" suffix))))
+
+               (use-modules (ice-9 string-fun))
+               (for-each
+                 (lambda (f)
+                   (rename-file
+                     f
+                     (string-replace-substring f "Hash" "LinkedHash")))
+                 (find-files "." "(^|[^_[:alnum:]]|new)Hash(Map|Set)"))))
+           (add-before 'build 'disable-classpath-from-env
+             (lambda _
+               (substitute* "build.xml"
+                 (("<project[^>]+>" all) (string-append all "<property name=\"build.sysclasspath\" value=\"ignore\"/>")))))
+           (add-before 'build 'prepare-lib-dirs
+             (lambda* (#:key inputs #:allow-other-keys)
+               ;; build.xml expects exact file names in dependencies directory
+               (mkdir-p "dependencies/ant-1.7/lib")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "ant")
+                   "/lib/ant.jar")
+                 "dependencies/ant-1.7/lib/ant.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-jline")
+                   "/share/java/jline.jar")
+                 "dependencies/jline.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-cli-parser")
+                   "/share/java/cli-parser.jar")
+                 "dependencies/cli-parser-1.1.1.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-protobuf-api")
+                   "/share/java/protobuf.jar")
+                 "dependencies/protobuf-2.5.0-lite.jar")
+
+               (mkdir-p "dependencies/annotations")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "kotlin-jdk-annotations")
+                   "/share/java/kotlin-jdk-annotations.jar")
+                 "dependencies/annotations/kotlin-jdk-annotations.jar")
+
+               (mkdir-p "ideaSDK/core")
+               (for-each
+                 (lambda (p)
+                   (let*
+                     ((allJars (find-files
+                                 (assoc-ref inputs p)
+                                 ;; Exclude javadoc and other variants
+                                 "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                       (mainJar (if (= 1 (length allJars))
+                                  (car allJars)
+                                  (throw 'no-or-multiple-jars-found p))))
+
+                     (symlink
+                       mainJar
+                       (string-append "ideaSDK/core/" (basename mainJar)))))
+                 (list
+                   "java-cli-parser"
+                   "java-guava"
+                   "java-log4j-1.2-api"
+                   "java-jetbrains-asm-5"
+                   "intellij-annotations"
+                   "intellij-core-kotlin"
+                   "java-picocontainer"
+                   "java-jetbrains-trove4j"))
+
+               (mkdir-p "ideaSDK/jps")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "intellij-jps-model-impl")
+                   "/share/java/intellij-jps-model-impl.jar")
+                 "ideaSDK/jps/jps-model.jar")
+
+               ;; build.xml expects exact file names in ideaSDK/lib
+               (mkdir-p "ideaSDK/lib")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "intellij-compiler-javac2")
+                   "/share/java/intellij-compiler-javac2.jar")
+                 "ideaSDK/lib/javac2.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-protobuf-api")
+                   "/share/java/protobuf.jar")
+                 "ideaSDK/lib/protobuf-2.5.0.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-native-access-platform")
+                   "/share/java/jna-platform.jar")
+                 "ideaSDK/lib/jna-utils.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-jakarta-oro")
+                   "/share/java/jakarta-oro-2.0.8.jar")
+                 "ideaSDK/lib/oromatcher.jar")
+
+               (mkdir-p "lib")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-javax-inject")
+                   "/lib/m2/javax/inject/javax.inject/1/javax.inject-1.jar")
+                 "lib/javax.inject.jar")
+               ))
+
+           (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
+(define (kotlin-like-0.12.108-variants version sha256sum build-for-bootstrapping bootstrap-package)
+  (package
+    (name "kotlin")
+    (version version)
+    (source (origin
+              (method git-fetch)
+              (uri (git-reference
+                     (url "https://github.com/JetBrains/kotlin.git")
+                     (commit (string-append "build-" version))))
+              (file-name (git-file-name name version))
+              (sha256 (base32 sha256sum))
+              (patches `(,(string-append "patches/kotlin-" version ".patch")))
+              (modules '((guix build utils)))
+              (snippet `(for-each delete-file
+                          (find-files "." ".*\\.(a|class|exe|jar|so|zip)$")))))
+    (native-inputs
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-patched-20 java-javax-inject-java6
+            java-protobuf-api-2.5 intellij-annotations-141 intellij-compiler-javac2-141 intellij-core-kotlin-141
+            intellij-jps-model-impl-141 kotlin-jdk-annotations-patched))
+    (inputs '())
+    (propagated-inputs '()) ;; TODO: this means do not propagate anything, right?
+    (build-system ant-build-system)
+    (arguments
+      `(#:build-target "dist"
+         #:jdk ,icedtea-7
+         #:make-flags
+         ,#~(list (string-append "-Dkotlin-home=" #$output)
+                  (if #$build-for-bootstrapping "-Dbootstrap.build.no.tests=true" "")
+                  "-Dgenerate.javadoc=false"
+                  "-Dshrink=false"
+                  (string-append "-Dbuild.number=" #$version)
+                  (string-append "-Dbootstrap.compiler.home=" #$bootstrap-package))
+         #:tests? #f
+         #:phases
+         ,#~(modify-phases %standard-phases
+           (add-before 'build 'fix-value-order
+             ;; fix non-determenistic bytecode generation caused by random iteration order of basic hash maps and sets
+             (lambda _
+               (with-fluids ((%default-port-encoding "ISO-8859-1"))
+                 (substitute* (find-files "." "\\.(java|kt)$")
+                   (("([^_[:alnum:]]|new)Hash(Map|Set)" all prefix suffix) (string-append prefix "LinkedHash" suffix))))
+
+               (use-modules (ice-9 string-fun))
+               (for-each
+                 (lambda (f)
+                   (rename-file
+                     f
+                     (string-replace-substring f "Hash" "LinkedHash")))
+                 (find-files "." "(^|[^_[:alnum:]]|new)Hash(Map|Set)"))))
+           (add-before 'build 'disable-classpath-from-env
+             (lambda _
+               (substitute* "build.xml"
+                 (("<project[^>]+>" all) (string-append all "<property name=\"build.sysclasspath\" value=\"ignore\"/>")))))
+           (add-before 'build 'prepare-lib-dirs
+             (lambda* (#:key inputs #:allow-other-keys)
+               ;; build.xml expects exact file names in dependencies directory
+               (mkdir-p "dependencies/ant-1.7/lib")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "ant")
+                   "/lib/ant.jar")
+                 "dependencies/ant-1.7/lib/ant.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-jline")
+                   "/share/java/jline.jar")
+                 "dependencies/jline.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-cli-parser")
+                   "/share/java/cli-parser.jar")
+                 "dependencies/cli-parser-1.1.1.jar")
+               (symlink
+                 (string-append
+                   #$java-jarjar
+                   "/share/java/jarjar-1.4.jar")
+                 "dependencies/jarjar.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-protobuf-api")
+                   "/share/java/protobuf.jar")
+                 "dependencies/protobuf-2.5.0-lite.jar")
+
+               (mkdir-p "dependencies/annotations")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "kotlin-jdk-annotations")
+                   "/share/java/kotlin-jdk-annotations.jar")
+                 "dependencies/annotations/kotlin-jdk-annotations.jar")
+
+               (mkdir-p "ideaSDK/core")
+               (for-each
+                 (lambda (p)
+                   (let*
+                     ((allJars (find-files
+                                 (assoc-ref inputs p)
+                                 ;; Exclude javadoc and other variants
+                                 "(^[^[:digit:]]+|[[:digit:]]|4j|api)\\.jar$"))
+                       (mainJar (if (= 1 (length allJars))
+                                  (car allJars)
+                                  (throw 'no-or-multiple-jars-found p))))
+
+                     (symlink
+                       mainJar
+                       (string-append "ideaSDK/core/" (basename mainJar)))))
+                 (list
+                   "java-cli-parser"
+                   "java-guava"
+                   "java-log4j-1.2-api"
+                   "java-jetbrains-asm-5"
+                   "intellij-annotations"
+                   "intellij-core-kotlin"
+                   "java-picocontainer"
+                   "java-jetbrains-trove4j"))
+
+               (mkdir-p "ideaSDK/jps")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "intellij-jps-model-impl")
+                   "/share/java/intellij-jps-model-impl.jar")
+                 "ideaSDK/jps/jps-model.jar")
+
+               ;; build.xml expects exact file names in ideaSDK/lib
+               (mkdir-p "ideaSDK/lib")
+               (symlink
+                 (string-append
+                   #$java-jetbrains-asm-5
+                   "/lib/m2/org/ow2/asm/asm/5.2/asm-5.2.jar")
+                 "ideaSDK/lib/asm-all.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "intellij-compiler-javac2")
+                   "/share/java/intellij-compiler-javac2.jar")
+                 "ideaSDK/lib/javac2.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-protobuf-api")
+                   "/share/java/protobuf.jar")
+                 "ideaSDK/lib/protobuf-2.5.0.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-native-access-platform")
+                   "/share/java/jna-platform.jar")
+                 "ideaSDK/lib/jna-utils.jar")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-jakarta-oro")
+                   "/share/java/jakarta-oro-2.0.8.jar")
+                 "ideaSDK/lib/oromatcher.jar")
+
+               (mkdir-p "lib")
+               (symlink
+                 (string-append
+                   (assoc-ref inputs "java-javax-inject")
+                   "/lib/m2/javax/inject/javax.inject/1/javax.inject-1.jar")
+                 "lib/javax.inject.jar")
+               ))
+
+           (delete 'install))))
+    (home-page "https://kotlinlang.org/")
+    (synopsis "Kotlin programming language")
+    (description "Kotlin programming language")
+    (license license:asl2.0)))
+
 (define kotlin-0.6.2451-bootstrap
   (kotlin-like-0.6.2451-variants "0.6.2451" "1ihk7nxdfhird7ai2l3xvjqpb0a717hqvm9g9697w4xq3jil8fla" #t kotlin-0.6.2338))
 (define kotlin-0.6.2516-bootstrap
@@ -4225,4 +4544,24 @@
 (define kotlin-0.10.1336-bootstrap
   (kotlin-like-0.10.1023-variants "0.10.1336" "0pfcwcpnv94gbzmzbv3g53yblwr5ifrxw7d4jnrgbm58qvzw4l47" #t kotlin-0.10.1023-bootstrap))
 
-kotlin-0.10.1336-bootstrap
+(define kotlin-0.10.1426-bootstrap
+  (kotlin-like-0.10.1426-variants "0.10.1426" "1yklmxcficslqw960nxwkwb07ywsd3bl52315x4bbcg0pg8nz3pl" #t kotlin-0.10.1336-bootstrap))
+(define kotlin-0.10.1464-bootstrap
+  (kotlin-like-0.10.1426-variants "0.10.1464" "0i1cyzph5nqfhqay6ivwy10nw0lk3g76yapzqdf31xqjafsca7qx" #t kotlin-0.10.1426-bootstrap))
+(define kotlin-0.11.153-bootstrap
+  (kotlin-like-0.10.1426-variants "0.11.153" "1nfiz7kcqlxn2q1347mw494fxq83mkipswsq4pwair02akaagnyp" #t kotlin-0.10.1464-bootstrap))
+(define kotlin-0.11.873-bootstrap
+  (kotlin-like-0.10.1426-variants "0.11.873" "0kx9v0i0c9vywcbsaifc6xc0jwharn2p1qnpnxhylk1kicjfb1yw" #t  kotlin-0.11.153-bootstrap))
+(define kotlin-0.11.992-bootstrap
+  (kotlin-like-0.10.1426-variants "0.11.992" "0ilbjiwfwryrn3107z2y3arljw6p0ahdr0wxrfqki0xw7h6iajay" #t  kotlin-0.11.873-bootstrap))
+(define kotlin-0.11.1014-bootstrap
+  (kotlin-like-0.10.1426-variants "0.11.1014" "097c1ng38qv9c4a4kp8gh5slqsy9426blf15ilgb6rvmhsmyh0p3" #t  kotlin-0.11.992-bootstrap))
+(define kotlin-0.11.1201-bootstrap
+  (kotlin-like-0.10.1426-variants "0.11.1201" "00h8jsmlj94h64sf451f8c35xknxisbw9zlkh38akpn1fnls9xnv" #t  kotlin-0.11.1014-bootstrap))
+(define kotlin-0.11.1393-bootstrap
+  (kotlin-like-0.10.1426-variants "0.11.1393" "0awx55k4mcc2l04dnlz43kfdjq959zr0qhpqd1zrnls5n58r6rch" #t  kotlin-0.11.1201-bootstrap))
+
+(define kotlin-0.12.108-bootstrap
+  (kotlin-like-0.12.108-variants "0.12.108" "0zvbmmlajzw8z3zwjj5p87mw2k4kip7lyaq8nw26k78ybgbcl3kz" #t  kotlin-0.11.1393-bootstrap))
+
+kotlin-0.12.108-bootstrap
