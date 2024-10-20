@@ -1,0 +1,18 @@
+on:
+  push:
+    branches:
+    - k1
+  pull_request:
+    branches:
+    - k1
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install GNU Guix
+      uses: PromyLOPh/guix-install-action@v1
+      with:
+        pullAfterInstall: true
+    - uses: actions/checkout@v4
+    - name: Build
+      run: guix build -f kotlin.scm --verbosity=2
