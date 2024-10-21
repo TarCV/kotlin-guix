@@ -2,7 +2,7 @@ diff --git a/build.xml b/build.xml
 index 2e43c55c18a..f3dcb2e445f 100644
 --- a/build.xml
 +++ b/build.xml
-@@ -877,7 +877,7 @@
+@@ -766,7 +766,7 @@
              <jar-content>
                  <fileset dir="${output}/classes/reflection"/>
                  <fileset dir="${output}/classes/core"/>

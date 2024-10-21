@@ -46,6 +46,36 @@
             (string-append ,target-dir "/" (basename mainJar)))))
       ,package-names)))
 
+(define (kotlin-make-flags version bootstrap-package build-for-bootstrapping)
+  #~(list (string-append "-Dkotlin-home=" #$output)
+          (if #$build-for-bootstrapping "-Dbootstrap.build.no.tests=true" "")
+          "-Dgenerate.javadoc=false"
+          "-Dshrink=false"
+          (string-append "-Dbuild.number=" #$version)
+          (string-append "-Dbootstrap.compiler.home=" #$bootstrap-package)))
+
+(define (kotlin-source-by-tag version sha256sum)
+  (origin
+    (method git-fetch)
+    (uri (git-reference
+           (url "https://github.com/JetBrains/kotlin.git")
+           (commit (string-append "build-" version))))
+    (file-name (git-file-name "kotlin" version))
+    (sha256 (base32 sha256sum))
+    (patches `(,(string-append "patches/kotlin-" version ".patch")))
+    (modules '((guix build utils)))
+    (snippet `(for-each delete-file
+                (find-files "." ".*\\.(a|class|exe|jar|so|zip)$")))))
+
+(define (package-by-inheriting-kotlin-package inherited-package version sha256sum build-for-bootstrapping phase-modification)
+  (package (inherit inherited-package)
+    (version version)
+    (source (kotlin-source-by-tag version sha256sum))
+    (arguments
+      `(,@(substitute-keyword-arguments (package-arguments inherited-package)
+            ((#:make-flags make-flags) (kotlin-make-flags version inherited-package #t))
+            ((#:phases phases) (phase-modification phases)))))))
+
 (define ant-contrib
   (package
     (name "ant-contrib")
@@ -4392,7 +4422,7 @@
              (lambda _
                (substitute* "build.xml"
                  (("<project[^>]+>" all) (string-append all "<property name=\"build.sysclasspath\" value=\"ignore\"/>")))))
-           (add-before 'build 'prepare-lib-dirs
+           (add-before 'build 'prepare-ant-lib-dir
              (lambda* (#:key inputs #:allow-other-keys)
                ;; build.xml expects exact file names in dependencies directory
                (mkdir-p "dependencies/ant-1.7/lib")
@@ -4400,7 +4430,10 @@
                  (string-append
                    (assoc-ref inputs "ant")
                    "/lib/ant.jar")
-                 "dependencies/ant-1.7/lib/ant.jar")
+                 "dependencies/ant-1.7/lib/ant.jar")))
+           (add-before 'build 'prepare-lib-dirs
+             (lambda* (#:key inputs #:allow-other-keys)
+                 ;; build.xml expects exact file names in dependencies directory
                (symlink
                  (string-append
                    (assoc-ref inputs "java-jline")
@@ -4563,5 +4596,25 @@
 
 (define kotlin-0.12.108-bootstrap
   (kotlin-like-0.12.108-variants "0.12.108" "0zvbmmlajzw8z3zwjj5p87mw2k4kip7lyaq8nw26k78ybgbcl3kz" #t  kotlin-0.11.1393-bootstrap))
+(define kotlin-0.12.115-bootstrap
+  (kotlin-like-0.12.108-variants "0.12.115" "1k0dwb6xkqjpg8m8g2220v9nbp1fqr7ixkks3p0papkfc0x6h07g" #t  kotlin-0.12.108-bootstrap))
+(define kotlin-0.12.176-bootstrap
+  (kotlin-like-0.12.108-variants "0.12.176" "0357bg7729j4lpvd063d3ar7lhm4zxg1rjf9rp5yr72cl17yqi91" #t  kotlin-0.12.115-bootstrap))
 
-kotlin-0.12.108-bootstrap
+(define kotlin-0.12.470-bootstrap
+  (package-by-inheriting-kotlin-package
+    kotlin-0.12.176-bootstrap
+    "0.12.470"
+    "1ilbgyjl7qqvs4fzx9x9aji3b5vdh00qzw32r8k5sr2zwq2zcw82"
+    #t
+    (lambda (phases)
+     `(modify-phases ,phases
+        (replace 'prepare-ant-lib-dir
+          (lambda _
+            ;; build.xml expects exact file names in dependencies directory
+            (mkdir-p "dependencies/ant-1.8/lib")
+            (symlink
+              (string-append ,ant "/lib/ant.jar")
+              "dependencies/ant-1.8/lib/ant.jar")))))))
+
+kotlin-0.12.470-bootstrap
