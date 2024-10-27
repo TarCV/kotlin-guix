@@ -17,6 +17,7 @@
 ;; TODO: improve jar/zip cleanup
 ;; TODO: ignore stdlib directories when doing HashMap/Set->LinkedHashMap/Set replacement
 ;; TODO: update ASM 3.1 to latest minor of release 3
+;; TODO: try using latest ASM, IJ, etc for non-public kotlin packages
 ;; TODO: add verification that symlink target exists
 ;; TODO: recheck all hashes with guix download
 ;; TODO: disable non-null assertions in non-public kotlin packages
@@ -25,7 +26,7 @@
 ;; TODO: delete unused sources before building
 ;; TODO: try using just the latest intellij, asm, annotations versions
 ;; TODO: avoid using Java 7+ features in public kotlin packages
-;; TODO: why building the same packages leads to different results before and after reboot?
+;; TODO: change unpack to avoid extracting everything (but how to keep patching?)
 
 (define (link-input-jars target-dir package-names)
   `(lambda* (#:key inputs #:allow-other-keys)
@@ -54,7 +55,32 @@
           (string-append "-Dbuild.number=" #$version)
           (string-append "-Dbootstrap.compiler.home=" #$bootstrap-package)))
 
-(define (kotlin-source-by-tag version sha256sum)
+(define (intellij-module-by-branch module-dirs version sha256sum additional-patches)
+  (origin
+    (method url-fetch)
+    (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+    (file-name (string-append "intellij-community-" version ".tar.gz"))
+    (sha256 (base32 sha256sum))
+    (patches `(,(string-append "patches/sdk-" version ".patch") ,@additional-patches))
+    (modules '((guix build utils)))
+    (snippet
+      `(begin
+         (delete-file-recursively "build")
+         (for-each
+           (lambda (d) (copy-recursively d "module"))
+           (list ,@module-dirs))
+         ;; Keep only the combined source (and ignore current/parent directory links)
+         (use-modules (ice-9 ftw) (ice-9 regex))
+         (for-each (lambda (f)
+                     (delete-file-recursively f))
+           (filter
+             (lambda (n) (not (regexp-match? (string-match "^(\\.+|module)$" n))))
+             (scandir ".")))
+
+         (for-each delete-file
+           (find-files "module" ".*\\.(a|class|exe|jar|so|zip)$"))))))
+
+(define (kotlin-source-by-tag version sha256sum additional-patches)
   (origin
     (method git-fetch)
     (uri (git-reference
@@ -62,17 +88,20 @@
            (commit (string-append "build-" version))))
     (file-name (git-file-name "kotlin" version))
     (sha256 (base32 sha256sum))
-    (patches `(,(string-append "patches/kotlin-" version ".patch")))
+    (patches `(,(string-append "patches/kotlin-" version ".patch") ,@additional-patches))
     (modules '((guix build utils)))
     (snippet `(for-each delete-file
                 (find-files "." ".*\\.(a|class|exe|jar|so|zip)$")))))
 
-(define (package-by-inheriting-kotlin-package inherited-package version sha256sum build-for-bootstrapping phase-modification)
+(define (package-by-inheriting-kotlin-package inherited-package version sha256sum additional-patches
+          native-inputs-modification jdk-modification phase-modification)
   (package (inherit inherited-package)
     (version version)
-    (source (kotlin-source-by-tag version sha256sum))
+    (source (kotlin-source-by-tag version sha256sum additional-patches))
+    (native-inputs `(,@(native-inputs-modification (package-native-inputs inherited-package))))
     (arguments
       `(,@(substitute-keyword-arguments (package-arguments inherited-package)
+            ((#:jdk jdk) (jdk-modification jdk))
             ((#:make-flags make-flags) (kotlin-make-flags version inherited-package #t))
             ((#:phases phases) (phase-modification phases)))))))
 
@@ -589,6 +618,29 @@
     (description "IntelliJ Platform, annotations submodule")
     (license license:asl2.0)))
 
+(define intellij-annotations-143
+  (package
+    (name "intellij-annotations")
+    (version "143")
+    (source (intellij-module-by-branch (list "platform/annotations")
+              version "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"
+              '()))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-annotations.jar"
+         #:source-dir "module/java5/src"
+         #:tests? #f ;; This module doesn't have tests
+         #:make-flags (list "-Dant.build.javac.target=1.5")
+         #:phases
+         (modify-phases %standard-phases
+           (add-after 'unpack 'copy-module-sources
+             (lambda _
+               (copy-recursively "module/common/src" "module/java5/src"))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Annotations")
+    (description "IntelliJ Platform, annotations submodule")
+    (license license:asl2.0)))
+
 (define intellij-util-rt-133
   (package
     (name "intellij-util-rt")
@@ -1030,6 +1082,26 @@
     (description "IntelliJ Platform: compiler javac2 and instrumentation-util modules.")
     (license license:asl2.0)))
 
+(define intellij-compiler-javac2-143
+  (package
+    (name "intellij-compiler-javac2")
+    (version "143")
+    (source (intellij-module-by-branch (list "java/compiler/javac2" "java/compiler/instrumentation-util")
+              version "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"
+              '()))
+    (propagated-inputs
+      (list java-jetbrains-asm-5))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-compiler-javac2.jar"
+         #:source-dir "module/src"
+         #:tests? #f ; combined modules don't have tests
+         #:make-flags (list "-Dant.build.javac.target=1.5")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: compiler modules.")
+    (description "IntelliJ Platform: compiler javac2 and instrumentation-util modules.")
+    (license license:asl2.0)))
+
 (define intellij-compiler-instrumentation-util-133
   (package
     (name "intellij-compiler-instrumentation-util")
@@ -1350,6 +1422,30 @@
     (arguments
       `(#:jar-name "intellij-util-rt.jar"
         #:source-dir "platform/util-rt/src"
+        #:tests? #f ;; This module doesn't have tests
+        #:make-flags (list "-Dant.build.javac.target=1.6")
+        #:phases
+          (modify-phases %standard-phases
+            (add-before 'build 'stub-phase ;; Guix doesn't like if below without this stub
+              (lambda _ '())))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Util-rt")
+    (description "IntelliJ Platform, util-rt submodule")
+    (license license:asl2.0)))
+
+(define intellij-util-rt-143
+  (package
+    (name "intellij-util-rt")
+    (version "143")
+    (source (intellij-module-by-branch (list "platform/util-rt")
+              version  "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"
+              '()))
+    (build-system ant-build-system)
+    (native-inputs
+      (list intellij-annotations-143))
+    (arguments
+      `(#:jar-name "intellij-util-rt.jar"
+        #:source-dir "module/src"
         #:tests? #f ;; This module doesn't have tests
         #:make-flags (list "-Dant.build.javac.target=1.6")
         #:phases
@@ -1763,6 +1859,83 @@
     (description "IntelliJ Platform, util submodule")
     (license license:asl2.0)))
 
+(define intellij-util-143
+  (package
+    (name "intellij-util")
+    (version "143")
+    (source (origin
+        (method url-fetch)
+        (uri (string-append "https://github.com/JetBrains/intellij-community/archive/refs/heads/" version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256 (base32 "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"))
+        (patches '("patches/sdk-143.patch" "patches/sdk-util-143-jdom.patch"
+                   "patches/sdk-util-143-remove-imgscalr.patch" "patches/sdk-util-143-tests.patch"))
+        (modules '((guix build utils)))
+        (snippet
+          '(begin
+             (rename-file "platform/util" "module")
+             ;; Keep "bin/idea.properties" as it is needed for tests
+             (rename-file "bin/idea.properties" "module/idea.properties")
+
+             (copy-recursively "platform/platform-resources/src" "module/test-resources")
+             (copy-recursively "platform/platform-resources-en/src" "module/test-resources")
+
+             ;; Keep only the module source and a required file from bin
+             (use-modules (ice-9 ftw) (ice-9 regex))
+             (for-each (lambda (f)
+                         (delete-file-recursively f))
+               (filter
+                 (lambda (n) (not (regexp-match? (string-match "^(\\.+|module)$" n))))
+                 (scandir ".")))
+            (mkdir "bin")
+            (rename-file "module/idea.properties" "bin/idea.properties")
+
+            (for-each delete-file
+                (find-files "module" ".*\\.(a|class|exe|jar|so|zip)$"))))))
+    (build-system ant-build-system)
+    (native-inputs
+      (list intellij-annotations-143 java-assertj java-junit java-hamcrest-all))
+    (propagated-inputs
+      (list java-cglib java-jakarta-oro java-jdom java-log4j-1.2-api java-native-access java-native-access-platform
+            java-jsr166e-seqlock java-iq80-snappy java-picocontainer intellij-util-rt-143 java-jetbrains-trove4j))
+    (arguments
+      `(#:jar-name "intellij-util.jar"
+        #:source-dir "module/src"
+        #:test-dir "module/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.6")
+        #:phases
+        (modify-phases %standard-phases
+          (add-before 'build 'remove-mac-code
+            (lambda _
+              (for-each delete-file
+                (list
+                  "module/src/com/intellij/util/AppleHiDPIScaledImage.java"
+                  "module/src/com/intellij/util/ui/MacUIUtil.java"))
+              (delete-file-recursively "module/src/com/intellij/ui/mac")))
+          (add-before 'build 'remove-incompatible-tests
+            (lambda _
+              (for-each delete-file
+                (list
+                  ;; Remove a Mac only test
+                  "module/testSrc/com/intellij/util/FoundationTest.java"
+                  ;; This test crashes and is hard to debug
+                  "module/testSrc/com/intellij/openapi/util/io/FileAttributesReadingTest.java"
+                  ;; This test requires almost a half of IJ SDK to run
+                  "module/testSrc/com/intellij/util/lang/ReorderJarsTest.java"))))
+          (add-before 'build 'copy-resources
+            (lambda _
+              (copy-recursively "module/resources" "build/classes")
+              (copy-recursively "module/test-resources" "build/test-classes")))
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}")
+                (("<junit" all) (string-append all " filtertrace=\"false\""))))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: Util")
+    (description "IntelliJ Platform, util submodule")
+    (license license:asl2.0)))
+
 (define intellij-java-psi-api-133
   (package
     (name "intellij-java-psi-api")
@@ -2063,6 +2236,28 @@
     (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-api' submodule.")
     (license license:asl2.0)))
 
+(define intellij-jps-model-api-143
+  (package
+    (name "intellij-jps-model-api")
+    (version "143")
+    (source (intellij-module-by-branch (list "jps/model-api")
+              version "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"
+              '()))
+    (native-inputs
+     (list intellij-annotations-143))
+    (propagated-inputs
+     (list intellij-util-rt-143))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-jps-model-api.jar"
+        #:source-dir "module/src"
+        #:tests? #f ;; This module doesn't have tests
+        #:make-flags (list "-Dant.build.javac.target=1.6")))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "JetBrains Java Project System: Model API")
+    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-api' submodule.")
+    (license license:asl2.0)))
+
 (define intellij-jps-model-impl-133
   (package
     (name "intellij-jps-model-impl")
@@ -2333,6 +2528,34 @@
             (lambda _
               (substitute* "build.xml"
                 (("\\$\\{test\\.home\\}/java") "${test.home}"))))
+          (add-after 'build 'copy-metadata
+            (lambda _
+              (copy-recursively "jps/model-impl/src/META-INF" "build/classes/META-INF"))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "JetBrains Java Project System: Model implementation")
+    (description "Gant based build framework + dsl, with declarative project structure definition and automatic IntelliJ IDEA projects build. This package contains 'model-impl' submodule.")
+    (license license:asl2.0)))
+
+(define intellij-jps-model-impl-143
+  (package
+    (name "intellij-jps-model-impl")
+    (version "143")
+    (source (intellij-module-by-branch (list "jps/model-impl")
+              version "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"
+              '()))
+    (native-inputs
+     (list intellij-annotations-143))
+    (propagated-inputs
+      (list intellij-jps-model-api-143 intellij-util-143))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-jps-model-impl.jar"
+        #:source-dir "module/src"
+        ;; tests require testFramework module that is hard to separate from UI and other things not needed for Kotlin
+        #:tests? #f
+        #:make-flags (list "-Dant.build.javac.target=1.6")
+        #:phases
+        (modify-phases %standard-phases
           (add-after 'build 'copy-metadata
             (lambda _
               (copy-recursively "jps/model-impl/src/META-INF" "build/classes/META-INF"))))))
@@ -2766,6 +2989,74 @@
           (add-after 'unpack 'copy-module-metadata
             (lambda _
               (copy-recursively "platform/boot/src/META-INF" "build/classes/META-INF")))
+          (add-before 'build 'fix-test-target
+            (lambda _
+              (substitute* "build.xml"
+                (("\\$\\{test\\.home\\}/java") "${test.home}"))))
+          (add-before 'build 'unzip-jars
+            (lambda* (#:key inputs #:allow-other-keys)
+              (mkdir-p "build/classes")
+              (for-each
+                (lambda (p)
+                  (let
+                    ((jars (find-files
+                              (assoc-ref inputs p)
+                              ;; Exclude javadoc and other variants
+                              "([[:digit:]]|^[^[:digit:]]+)\\.jar$")))
+
+                      (invoke (string-append #$unzip "/bin/unzip")
+                        (if (= 1 (length jars))
+                            (car jars)
+                            (throw 'multiple-jars-found p))
+                        "-d"
+                        "build/classes"
+                        ;; These files are generated by 'jar' target for each jar file it creates
+                        "-x"
+                        "META-INF/INDEX.LIST"
+                        "META-INF/MANIFEST.MF")))
+                (list
+                  "java-jdom"
+                  "java-javax-inject"
+
+                  "intellij-jps-model-api"
+                  "intellij-jps-model-impl"
+                  "intellij-util"
+                  "intellij-util-rt")))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ platform: parts required for kotlin")
+    (description "This package provides minimal set of modules needed for compiling kotlinc and standard libraries.")
+    (license license:asl2.0)))
+
+(define intellij-core-kotlin-143
+  (package
+    (name "intellij-core-kotlin")
+    (version "143")
+    (source (intellij-module-by-branch
+              (list "java/java-psi-api" "java/java-psi-impl" "platform/boot" "platform/core-api" "platform/core-impl"
+                "platform/extensions")
+              version "0n52rkag7iav3lxzmvqbfg3ngw7rymfzhaxj6jshfdw9yw2x45pj"
+              '("patches/sdk-core-143-jdom.patch" "patches/sdk-core-143-remove-mac.patch")))
+    (native-inputs
+      (list intellij-annotations-143 java-jmock-1 java-junit java-hamcrest-all unzip))
+    (propagated-inputs
+      (list java-automaton java-guava-patched-20 java-javax-inject-java6 java-jetbrains-asm-4 java-iq80-snappy java-xstream
+            intellij-compiler-javac2-143 intellij-jps-model-impl-143 intellij-util-143))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "intellij-core.jar"
+        ;; Tests depend on JUnit compiled with default GUIX JDK, so use the same JDK here
+        #:source-dir "module/src"
+        #:test-dir "module/testSrc"
+        #:make-flags (list "-Dant.build.javac.target=1.6")
+        #:phases
+        ,#~(modify-phases %standard-phases
+          (add-after 'unpack 'copy-generated-sources
+            (lambda _
+              (copy-recursively "module/gen" "module/src"))) ;; TODO: should these sources be regenerated?
+          (add-after 'unpack 'copy-module-messages
+            (lambda _ (copy-recursively "module/src/messages" "build/classes/messages")))
+          (add-after 'unpack 'copy-module-metadata
+            (lambda _ (copy-recursively "module/src/META-INF" "build/classes/META-INF")))
           (add-before 'build 'fix-test-target
             (lambda _
               (substitute* "build.xml"
@@ -4602,13 +4893,12 @@
   (kotlin-like-0.12.108-variants "0.12.176" "0357bg7729j4lpvd063d3ar7lhm4zxg1rjf9rp5yr72cl17yqi91" #t  kotlin-0.12.115-bootstrap))
 
 (define kotlin-0.12.470-bootstrap
-  (package-by-inheriting-kotlin-package
-    kotlin-0.12.176-bootstrap
-    "0.12.470"
-    "1ilbgyjl7qqvs4fzx9x9aji3b5vdh00qzw32r8k5sr2zwq2zcw82"
-    #t
-    (lambda (phases)
-     `(modify-phases ,phases
+  (package-by-inheriting-kotlin-package kotlin-0.12.176-bootstrap
+    "0.12.470" "1ilbgyjl7qqvs4fzx9x9aji3b5vdh00qzw32r8k5sr2zwq2zcw82" '()
+    (lambda (inherited-native-inputs) inherited-native-inputs)
+    (lambda (inherited-jdk) icedtea-8)
+    (lambda (inherited-phases)
+     `(modify-phases ,inherited-phases
         (replace 'prepare-ant-lib-dir
           (lambda _
             ;; build.xml expects exact file names in dependencies directory
@@ -4617,4 +4907,77 @@
               (string-append ,ant "/lib/ant.jar")
               "dependencies/ant-1.8/lib/ant.jar")))))))
 
-kotlin-0.12.470-bootstrap
+(define kotlin-0.12.1077-bootstrap
+  (package-by-inheriting-kotlin-package kotlin-0.12.470-bootstrap
+    "0.12.1077" "06glx32g8r3pzgyij52spgyz9w9drq9bghl6c92n2w1rmf2afd7j"
+    '("patches/kotlin-0.12.1077-asm.patch" "patches/kotlin-0.12.1077-pack-jar.patch")
+    (lambda (inherited-native-inputs)
+      (list ant ant-contrib java-cli-parser java-jline-2 java-guava-patched-20 java-javax-inject-java6
+            java-protobuf-api-2.5 intellij-annotations-143 intellij-compiler-javac2-143 intellij-core-kotlin-143
+            intellij-jps-model-impl-143 kotlin-jdk-annotations-patched))
+    (lambda (inherited-jdk) inherited-jdk)
+    (lambda (inherited-phases)
+      `(modify-phases ,inherited-phases
+         (add-before 'build 'prepare-jansi-libs
+           (lambda _
+             (mkdir-p "dependencies")
+             (symlink
+               (string-append
+                 ,java-jansi-1
+                 "/lib/m2/org/fusesource/jansi/jansi/"
+                 ,(package-version java-jansi-1)
+                 "/jansi-"
+                 ,(package-version java-jansi-1)
+                 ".jar")
+               "dependencies/jansi.jar")
+             (symlink
+               (string-append
+                 ,java-jansi-native
+                 "/lib/m2/org/fusesource/jansi/jansi-native/"
+                 ,(package-version java-jansi-native)
+                 "/jansi-native-"
+                 ,(package-version java-jansi-native)
+                 ".jar")
+               "dependencies/jansi-native.jar")))
+         (add-after 'prepare-lib-dirs 'prepare-lib-dirs-jna-fixup
+           (lambda _
+             ;; This version of Kotlin updated to a newer version of the jar which has a different file name, while the
+             ;; inherited phases already use that newer version under the old name.
+             (rename-file "ideaSDK/lib/jna-utils.jar" "ideaSDK/lib/jna-platform.jar")))))))
+(define kotlin-0.12.1250-bootstrap
+  (package-by-inheriting-kotlin-package kotlin-0.12.1077-bootstrap
+    "0.12.1250" "0rq1lq1hhilfdvay0k24vwv5hf7mlvf18df547nh9hz8zickciqi"
+    '("patches/kotlin-0.12.1077-asm.patch" "patches/kotlin-0.12.1077-pack-jar.patch")
+    (lambda (inherited-native-inputs) inherited-native-inputs)
+    (lambda (inherited-jdk) inherited-jdk)
+    (lambda (inherited-phases) inherited-phases)))
+(define kotlin-0.12.1306-bootstrap
+  (package-by-inheriting-kotlin-package kotlin-0.12.1250-bootstrap
+    "0.12.1306" "04s8byvvp1lil0ckpwl3qqsxwn0nm22j23g29v2r7pblkpk3h6ww"
+    '("patches/kotlin-0.12.1077-asm.patch" "patches/kotlin-0.12.1077-pack-jar.patch")
+    (lambda (inherited-native-inputs) inherited-native-inputs)
+    (lambda (inherited-jdk) inherited-jdk)
+    (lambda (inherited-phases) inherited-phases)))
+(define kotlin-0.13.177-bootstrap
+  (package-by-inheriting-kotlin-package kotlin-0.12.1306-bootstrap
+    "0.13.177" "1pzhm5qxaq149ca5qba2brr6vhmky6ip6j9hc0a03g47j6814f2z"
+    '("patches/kotlin-0.12.1077-asm.patch" "patches/kotlin-0.12.1077-pack-jar.patch")
+    (lambda (inherited-native-inputs) inherited-native-inputs)
+    (lambda (inherited-jdk) inherited-jdk)
+    (lambda (inherited-phases) inherited-phases)))
+(define kotlin-0.13.791-bootstrap
+  (package-by-inheriting-kotlin-package kotlin-0.13.177-bootstrap
+    "0.13.791" "1y4ywggvbbj1kl8anz8kx3ccnsp0gkvfz67ppd2gphdd86fmad71"
+    '("patches/kotlin-0.12.1077-asm.patch" "patches/kotlin-0.12.1077-pack-jar.patch")
+    (lambda (inherited-native-inputs) inherited-native-inputs)
+    (lambda (inherited-jdk) inherited-jdk)
+    (lambda (inherited-phases) inherited-phases)))
+(define kotlin-0.13.899-bootstrap
+  (package-by-inheriting-kotlin-package kotlin-0.13.791-bootstrap
+    "0.13.899" "10x2vsz8nzixqsr7scgchnmqqg6w6v90xmyz73p9zrpwx8bqwscw"
+    '("patches/kotlin-0.12.1077-asm.patch" "patches/kotlin-0.12.1077-pack-jar.patch")
+    (lambda (inherited-native-inputs) inherited-native-inputs)
+    (lambda (inherited-jdk) inherited-jdk)
+    (lambda (inherited-phases) inherited-phases)))
+
+kotlin-0.13.899-bootstrap
