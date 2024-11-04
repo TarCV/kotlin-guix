@@ -1,0 +1,11 @@
+--- a/compiler/jet.as.java.psi/src/org/jetbrains/jet/asJava/StubClassBuilder.java
++++ b/compiler/jet.as.java.psi/src/org/jetbrains/jet/asJava/StubClassBuilder.java
+@@ -44,7 +44,7 @@
+         }
+
+         @Override
+-        public ClassReader readerForInnerClass(Object o) {
++        public void accept(Object o, StubBuildingVisitor<Object> visitor) {
+             throw new UnsupportedOperationException("Shall not be called!");
+         }
+     };

@@ -1,0 +1,16 @@
+--- a/build.xml
++++ a/build.xml
+@@ -69,12 +69,7 @@
+     <typedef resource="org/jetbrains/kotlin/ant/antlib.xml" classpath="${bootstrap.compiler.home}/lib/kotlin-ant.jar"/>
+     <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpath="${dependencies.dir}/ant-contrib.jar"/>
+
+-    <path id="javac2.classpath">
+-        <pathelement location="${idea.sdk}/lib/javac2.jar"/>
+-        <pathelement location="${idea.sdk}/lib/asm-all.jar"/>
+-    </path>
+-    <taskdef name="javac2" classname="com.intellij.ant.Javac2" classpathref="javac2.classpath" loaderref="javac2.loader"/>
+-    <typedef name="skip" classname="com.intellij.ant.ClassFilterAnnotationRegexp" classpathref="javac2.classpath" loaderref="javac2.loader"/>
++    <taskdef name="javac2" classname="org.apache.tools.ant.taskdefs.Javac"/>
+
+     <dirset id="compilerSources.dirset" dir="${basedir}/">
+         <include name="core/descriptor.loader.java/src"/>

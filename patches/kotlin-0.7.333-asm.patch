@@ -1,0 +1,10 @@
+--- a/compiler/backend/src/org/jetbrains/jet/codegen/inline/InlineAdapter.java
++++ b/compiler/backend/src/org/jetbrains/jet/codegen/inline/InlineAdapter.java
+@@ -35,6 +35,6 @@
+     private int nextLocalIndexBeforeInline = -1;
+
+     public InlineAdapter(MethodVisitor mv, int localsSize) {
+-        super(mv);
++        super(org.jetbrains.org.objectweb.asm.Opcodes.ASM4, mv);
+         nextLocalIndex = localsSize;
+     }

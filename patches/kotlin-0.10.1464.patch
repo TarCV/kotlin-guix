@@ -2,22 +2,12 @@ diff --git a/build.xml b/build.xml
 index ca883bdc774..824315217ad 100644
 --- a/build.xml
 +++ b/build.xml
-@@ -857,7 +857,7 @@
-             <jar-content>
-                 <fileset dir="${output}/classes/reflection"/>
-                 <fileset dir="${output}/classes/core"/>
--                <zipfileset src="${protobuf-lite.jar}"/>
--                <zipfileset src="${javax.inject.jar}"/>
-+                <zipfileset src="${protobuf-lite.jar}" excludes="META-INF/INDEX.LIST"/><!-- In Guix all jars have the index -->
-+                <zipfileset src="${javax.inject.jar}" excludes="META-INF/INDEX.LIST"/>
-             </jar-content>
-         </pack-runtime-jar>
 @@ -892,7 +892,7 @@
              depends="builtins,stdlib,core,reflection,pack-runtime,pack-runtime-sources"/>
  
      <target name="dist"
 -            depends="clean,init,prepare-dist,preloader,serialize-builtins,compiler,compiler-sources,ant-tools,jdk-annotations,android-sdk-annotations,runtime,kotlin-js-stdlib,android-compiler-plugin"
-+            depends="clean,init,prepare-dist,preloader,serialize-builtins,compiler,compiler-sources,ant-tools,jdk-annotations,runtime"
++            depends="clean,init,prepare-dist,preloader,serialize-builtins,compiler,compiler-sources,ant-tools,jdk-annotations,android-sdk-annotations,runtime,android-compiler-plugin"
              description="Builds redistributables from sources"/>
  
      <target name="dist-quick"
@@ -47,14 +37,3 @@ index 3de5e5d4100..d1309910f29 100644
  
  private class LinesStream(private val reader: BufferedReader) : Sequence<String> {
      override fun iterator(): Iterator<String> {
---- a/compiler/backend/src/org/jetbrains/kotlin/codegen/ImplementationBodyCodegen.java
-+++ b/compiler/backend/src/org/jetbrains/kotlin/codegen/ImplementationBodyCodegen.java
-@@ -694,7 +694,7 @@ private Type genPropertyOnStack(InstructionAdapter iv, MethodContext context, PropertyDescriptor propertyDescriptor, int index) {
-                 Type type = typeMapper.mapType(propertyDescriptor.getType());
-                 String fieldName = ((FieldOwnerContext) context.getParentContext()).getFieldName(propertyDescriptor, false);
-                 iv.getfield(classAsmType.getInternalName(), fieldName, type.getDescriptor());
--                return type.getReturnType();
-+                String descriptor = type.getDescriptor(); if (descriptor.contains(")")) { throw new IllegalStateException(descriptor); } else { return Type.getType(descriptor); }
-             }
-             else {
-                 //noinspection ConstantConditions

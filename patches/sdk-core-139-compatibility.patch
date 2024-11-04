@@ -1,0 +1,27 @@
+--- a/java/java-psi-impl/src/com/intellij/psi/impl/compiled/StubBuildingVisitor.java
++++ b/java/java-psi-impl/src/com/intellij/psi/impl/compiled/StubBuildingVisitor.java
+@@ -70,6 +70,10 @@ public class StubBuildingVisitor<T> extends ClassVisitor {
+   private PsiClassStub myResult;
+   private PsiModifierListStub myModList;
+ 
++  public StubBuildingVisitor(T classSource, InnerClassSourceStrategy<T> innersStrategy, StubElement parent, int access) {
++    this(classSource, innersStrategy, parent, access, null);
++  }
++
+   public StubBuildingVisitor(T classSource, InnerClassSourceStrategy<T> innersStrategy, StubElement parent, int access, String shortName) {
+     super(ASM_API);
+     mySource = classSource;
+--- a/java/java-psi-api/src/com/intellij/psi/compiled/ClassFileDecompilers.java
++++ b/java/java-psi-api/src/com/intellij/psi/compiled/ClassFileDecompilers.java
+@@ -85,10 +85,6 @@
+   @Nullable
+   public static Decompiler find(@NotNull VirtualFile file) {
++    // Extensions subsystem is not loaded in guix build of Kotlin, and there is no decompilers registered by default anyway
+-    for (Decompiler decompiler : EP_NAME.getExtensions()) {
+-      if ((decompiler instanceof Light || decompiler instanceof Full) && decompiler.accepts(file)) {
+-        return decompiler;
+-      }
+-    }
+
+     return null;
+   }
