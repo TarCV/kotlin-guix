@@ -1,0 +1,14 @@
+--- a/compiler/cli/src/org/jetbrains/jet/cli/jvm/compiler/MockPsiDocumentManager.java
++++ b/compiler/cli/src/org/jetbrains/jet/cli/jvm/compiler/MockPsiDocumentManager.java
+@@ -73,6 +73,11 @@
+         return document.getImmutableCharSequence();
+     }
+
++    @Override
++    public long getLastCommittedStamp(@NotNull Document document) {
++      return document.getModificationStamp();
++    }
++
+     @Override
+     @NotNull
+     public Document[] getUncommittedDocuments() {

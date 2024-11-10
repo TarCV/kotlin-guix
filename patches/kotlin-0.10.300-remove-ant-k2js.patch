@@ -1,0 +1,17 @@
+--- a/ant/src/org/jetbrains/jet/buildtools/ant/antlib.xml
++++ b/ant/src/org/jetbrains/jet/buildtools/ant/antlib.xml
+@@ -2,6 +2,5 @@
+ <!-- TODO: delete this file -->
+ <antlib>
+     <taskdef name="kotlinc" classname="org.jetbrains.kotlin.ant.Kotlin2JvmTask"/>
+-    <taskdef name="kotlin2js" classname="org.jetbrains.kotlin.ant.Kotlin2JsTask"/>
+     <typedef name="withKotlin" classname="org.jetbrains.kotlin.ant.KotlinCompilerAdapter"/>
+ </antlib>
+--- a/ant/src/org/jetbrains/kotlin/ant/antlib.xml
++++ b/ant/src/org/jetbrains/kotlin/ant/antlib.xml
+@@ -1,5 +1,4 @@
+ <antlib>
+     <taskdef name="kotlinc" classname="org.jetbrains.kotlin.ant.Kotlin2JvmTask"/>
+-    <taskdef name="kotlin2js" classname="org.jetbrains.kotlin.ant.Kotlin2JsTask"/>
+     <typedef name="withKotlin" classname="org.jetbrains.kotlin.ant.KotlinCompilerAdapter"/>
+ </antlib>

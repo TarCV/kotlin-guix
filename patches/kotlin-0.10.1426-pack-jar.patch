@@ -1,0 +1,12 @@
+--- a/build.xml
++++ b/build.xml
+@@ -857,7 +857,7 @@
+             <jar-content>
+                 <fileset dir="${output}/classes/reflection"/>
+                 <fileset dir="${output}/classes/core"/>
+-                <zipfileset src="${protobuf-lite.jar}"/>
+-                <zipfileset src="${javax.inject.jar}"/>
++                <zipfileset src="${protobuf-lite.jar}" excludes="META-INF/INDEX.LIST"/><!-- In Guix all jars have the index -->
++                <zipfileset src="${javax.inject.jar}" excludes="META-INF/INDEX.LIST"/>
+             </jar-content>
+         </pack-runtime-jar>

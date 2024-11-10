@@ -1,0 +1,11 @@
+--- a/build.xml
++++ b/build.xml
+@@ -303,7 +303,7 @@
+             <if>
+                 <istrue value="${bootstrap.build.no.tests}"/>
+                 <then>
+-                    <property name="compiler.manifest.class.path" value="."/>
++                    <property name="compiler.manifest.class.path" value=""/>
+                 </then>
+                 <else>
+                     <property name="compiler.manifest.class.path" value="kotlin-runtime.jar"/>

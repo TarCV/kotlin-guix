@@ -1,0 +1,12 @@
+--- a/platform/util-rt/src/com/intellij/util/containers/LinkedHashMap.java
++++ b/platform/util-rt/src/com/intellij/util/containers/LinkedHashMap.java
+@@ -17,7 +17,8 @@
+ import java.util.Map;
+
+ @SuppressWarnings("ClassNameSameAsAncestorName")
+-class LinkedHashMap<K, V> extends java.util.LinkedHashMap<K, V> {
++// Open the class for used in Kotlin compiler to fix non-deterministic bytecode generation
++public class LinkedHashMap<K, V> extends java.util.LinkedHashMap<K, V> {
+   public LinkedHashMap() { }
+
+   public LinkedHashMap(int i, float v) {

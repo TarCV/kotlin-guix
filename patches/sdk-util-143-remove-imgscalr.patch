@@ -1,0 +1,50 @@
+--- a/platform/util/src/com/intellij/openapi/util/IconLoader.java
++++ b/platform/util/src/com/intellij/openapi/util/IconLoader.java
+@@ -29,7 +29,6 @@
+ import com.intellij.util.ui.JBImageIcon;
+ import com.intellij.util.ui.JBUI;
+ import com.intellij.util.ui.UIUtil;
+-import org.imgscalr.Scalr;
+ import org.jetbrains.annotations.NonNls;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -432,16 +434,6 @@
+       if (result != null) {
+         return result;
+       }
+-
+-      final Image image = ImageUtil.filter(ImageLoader.loadFromUrl(myUrl, UIUtil.isUnderDarcula(), scaleFactor >= 1.5f), filter);
+-      if (image != null) {
+-        int width = (int)(getIconWidth() * scaleFactor);
+-        int height = (int)(getIconHeight() * scaleFactor);
+-        final BufferedImage resizedImage = Scalr.resize(ImageUtil.toBufferedImage(image), Scalr.Method.ULTRA_QUALITY, width, height);
+-        result = getIcon(resizedImage);
+-        scaledIcons.put(scaleFactor, result);
+-        return result;
+-      }
+
+       return this;
+     }
+--- a/platform/util/src/com/intellij/util/ImageLoader.java
++++ b/platform/util/src/com/intellij/util/ImageLoader.java
+@@ -25,7 +25,6 @@
+ import com.intellij.util.ui.ImageUtil;
+ import com.intellij.util.ui.JBUI;
+ import com.intellij.util.ui.UIUtil;
+-import org.imgscalr.Scalr;
+ import org.jetbrains.annotations.NonNls;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -101,11 +101,6 @@
+   @NotNull
+   private static Image scaleImage(Image image, float scale) {
+-    int width = (int)(scale * image.getWidth(null));
+-    int height = (int)(scale * image.getHeight(null));
+-    // Using "QUALITY" instead of "ULTRA_QUALITY" results in images that are less blurry
+-    // because ultra quality performs a few more passes when scaling, which introduces blurriness
+-    // when the scaling factor is relatively small (i.e. <= 3.0f) -- which is the case here.
+-    return Scalr.resize(ImageUtil.toBufferedImage(image), Scalr.Method.QUALITY, width, height);
++    return image;
+   }
+
+   @Nullable
