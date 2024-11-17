@@ -1,0 +1,247 @@
+--- a/platform/util/src/com/intellij/openapi/util/JDOMUtil.java
++++ b/platform/util/src/com/intellij/openapi/util/JDOMUtil.java
+@@ -112,12 +112,13 @@
+   private static int addToHash(int i, @NotNull Element element, boolean skipEmptyText) {
+     i = addToHash(i, element.getName());
+
+-    for (Attribute attribute : element.getAttributes()) {
++    for (Object attributeTmp : element.getAttributes()) {
++      Attribute attribute = (Attribute) attributeTmp;
+       i = addToHash(i, attribute.getName());
+       i = addToHash(i, attribute.getValue());
+     }
+
+-    for (Content child : element.getContent()) {
++    for (Object child : element.getContent()) {
+       if (child instanceof Element) {
+         i = addToHash(i, (Element)child, skipEmptyText);
+       }
+@@ -188,17 +189,18 @@
+   public static void internElement(@NotNull Element element, @NotNull StringInterner interner) {
+     element.setName(interner.intern(element.getName()));
+
+-    for (Attribute attr : element.getAttributes()) {
++    for (Object attrTmp : element.getAttributes()) {
++      Attribute attr = (Attribute) attrTmp;
+       attr.setName(interner.intern(attr.getName()));
+       attr.setValue(interner.intern(attr.getValue()));
+     }
+
+-    for (Content o : element.getContent()) {
++    for (Object o : element.getContent()) {
+       if (o instanceof Element) {
+         internElement((Element)o, interner);
+       }
+       else if (o instanceof Text) {
+-        ((Text)o).setText(interner.intern(o.getValue()));
++        ((Text)o).setText(interner.intern(((Text)o).getValue()));
+       }
+     }
+   }
+@@ -468,8 +468,8 @@
+   @NotNull
+   public static String writeChildren(@NotNull final Element element, @NotNull final String lineSeparator) throws IOException {
+     final StringWriter writer = new StringWriter();
+-    for (Element child : element.getChildren()) {
+-      writeElement(child, writer, lineSeparator);
++    for (Object child : element.getChildren()) {
++      writeElement((Element) child, writer, lineSeparator);
+       writer.append(lineSeparator);
+     }
+     return writer.toString();
+@@ -607,7 +607,7 @@
+       System.err.println(prefix);
+     }
+
+-    for (final Element child : element.getChildren()) {
+-      printDiagnostics(child, prefix);
++    for (final Object child : element.getChildren()) {
++      printDiagnostics((Element) child, prefix);
+     }
+   }
+--- a/platform/util/src/com/intellij/openapi/util/registry/Registry.java
++++ a/platform/util/src/com/intellij/openapi/util/registry/Registry.java
+@@ -119,6 +119,7 @@
+   public void loadState(@NotNull Element state) {
+     myUserProperties.clear();
+-    for (Element eachEntry : state.getChildren("entry")) {
++    for (Object eachEntryTmp : state.getChildren("entry")) {
++      Element eachEntry = (Element) eachEntryTmp;
+       String key = eachEntry.getAttributeValue("key");
+       String value = eachEntry.getAttributeValue("value");
+       if (key != null && value != null) {
+--- a/platform/util/src/com/intellij/util/xmlb/AbstractCollectionBinding.java
++++ b/platform/util/src/com/intellij/util/xmlb/AbstractCollectionBinding.java
+@@ -234,7 +237,8 @@
+   @NotNull
+   private Collection deserializeSingle(Object context, @NotNull Element node) {
+     Collection result = createCollection(node.getName());
+-    for (Element child : node.getChildren()) {
++    for (Object childTmp : node.getChildren()) {
++      Element child = (Element) childTmp;
+       //noinspection unchecked
+       result.add(deserializeItem(child, context));
+     }
+--- a/platform/util/src/com/intellij/util/xmlb/BeanBinding.java
++++ b/platform/util/src/com/intellij/util/xmlb/BeanBinding.java
+@@ -176,6 +176,7 @@
+   public void deserializeInto(@NotNull Object result, @NotNull Element element, @Nullable Set<String> accessorNameTracker) {
+     nextAttribute:
+-    for (org.jdom.Attribute attribute : element.getAttributes()) {
++    for (Object attributeTmp : element.getAttributes()) {
++      org.jdom.Attribute attribute = (org.jdom.Attribute) attributeTmp;
+       if (StringUtil.isEmpty(attribute.getNamespaceURI())) {
+         for (Binding binding : myBindings) {
+           if (binding instanceof AttributeBinding && ((AttributeBinding)binding).myName.equals(attribute.getName())) {
+@@ -192,6 +193,7 @@
+     MultiMap<Binding, Element> data = null;
+     nextNode:
+-    for (Content content : element.getContent()) {
++    for (Object contentTmp : element.getContent()) {
++      Content content = (Content) contentTmp;
+       if (content instanceof Comment) {
+         continue;
+       }
+--- a/platform/util/src/com/intellij/util/xmlb/CompactCollectionBinding.java
++++ b/platform/util/src/com/intellij/util/xmlb/CompactCollectionBinding.java
+@@ -57,7 +57,7 @@
+     List<String> list = (List<String>)context;
+     list.clear();
+     if (element.getName().equals(name)) {
+-      for (Element item : element.getChildren("item")) {
+-        ContainerUtil.addIfNotNull(list, item.getAttributeValue("value"));
++      for (Object item : element.getChildren("item")) {
++        ContainerUtil.addIfNotNull(list, ((Element) item).getAttributeValue("value"));
+       }
+     }
+@@ -68,7 +68,8 @@
+         value = value.getChild("list");
+       }
+       if (value != null) {
+-        for (Element item : value.getChildren("item")) {
++        for (Object itemTmp : value.getChildren("item")) {
++          Element item = (Element) itemTmp;
+           //noinspection SpellCheckingInspection
+           ContainerUtil.addIfNotNull(list, item.getAttributeValue("itemvalue"));
+         }
+--- a/platform/util/src/com/intellij/util/xmlb/JDOMXIncluder.java
++++ b/platform/util/src/com/intellij/util/xmlb/JDOMXIncluder.java
+@@ -54,7 +54,7 @@
+       throw new NullPointerException("Document must not be null");
+     }
+
+-    Document result = original.clone();
++    Document result = (Document)original.clone();
+
+     Element root = result.getRootElement();
+     List<Content> resolved = resolve(root, base);
+@@ -348,10 +348,12 @@
+   private Element resolveNonXIncludeElement(Element original, Stack<String> bases) throws XIncludeException {
+     Element result = new Element(original.getName(), original.getNamespace());
+-    for (Attribute a : original.getAttributes()) {
++    for (Object aTmp : original.getAttributes()) {
++      Attribute a = (Attribute)aTmp;
+-      result.setAttribute(a.clone());
++      result.setAttribute((Attribute)a.clone());
+     }
+
+-    for (Content o : original.getContent())  {
++    for (Object oTmp : original.getContent())  {
++      Content o = (Content)oTmp;
+       if (o instanceof Element) {
+         Element element = (Element)o;
+         if (isIncludeElement(element)) {
+@@ -362,6 +364,6 @@
+         }
+       }
+       else {
+-        result.addContent(o.clone());
++        result.addContent((Content)o.clone());
+       }
+     } // end while
+--- a/platform/util/src/com/intellij/util/xmlb/MapBinding.java
++++ b/platform/util/src/com/intellij/util/xmlb/MapBinding.java
+@@ -180,7 +180,8 @@
+     }
+     else if (myMapAnnotation != null && !myMapAnnotation.surroundKeyWithTag()) {
+       assert binding != null;
+-      for (Element element : entry.getChildren()) {
++      for (Object elementTmp : entry.getChildren()) {
++        Element element = (Element) elementTmp;
+         if (binding.isBoundTo(element)) {
+           return binding.deserialize(context, element);
+         }
+--- a/platform/util/src/com/intellij/openapi/util/JDOMExternalizer.java
++++ b/platform/util/src/com/intellij/openapi/util/JDOMExternalizer.java
+@@ -56,6 +56,7 @@ public static String readString(@NonNls Element root, @NonNls String name) {
+   @Nullable
+   public static String readString(@NonNls Element root, @NonNls String name) {
+-    for (Element element : root.getChildren("setting")) {
++    for (Object elementTmp : root.getChildren("setting")) {
++      Element element = (Element) elementTmp;
+       if (Comparing.strEqual(element.getAttributeValue("name"), name)) {
+         return element.getAttributeValue("value");
+       }
+@@ -100,7 +101,8 @@ public static void readMap(Element root, Map<String, String> map, @NonNls @Nullable String rootName, @NonNls String entryName) {
+       return;
+     }
+
+-    for (@NonNls Element element : mapRoot.getChildren(entryName)) {
++    for (@NonNls Object elementTmp : mapRoot.getChildren(entryName)) {
++      Element element = (Element) elementTmp;
+       String name = element.getAttributeValue("name");
+       if (name != null) {
+         map.put(name, element.getAttributeValue("value"));
+--- a/platform/util/src/com/intellij/util/xmlb/JDOMElementBinding.java
++++ b/platform/util/src/com/intellij/util/xmlb/JDOMElementBinding.java
+@@ -47,7 +47,7 @@
+     }
+
+     if (value instanceof Element) {
+-      Element targetElement = ((Element)value).clone();
++      Element targetElement = (Element) ((Element)value).clone();
+       assert targetElement != null;
+       targetElement.setName(myTagName);
+       return targetElement;
+@@ -55,7 +55,7 @@
+     if (value instanceof Element[]) {
+       ArrayList<Element> result = new ArrayList<Element>();
+       for (Element element : ((Element[])value)) {
+-        result.add(element.clone().setName(myTagName));
++        result.add(((Element) element.clone()).setName(myTagName));
+       }
+       return result;
+     }
+--- a/platform/util/src/com/intellij/openapi/util/DefaultJDOMExternalizer.java
++++ b/platform/util/src/com/intellij/openapi/util/DefaultJDOMExternalizer.java
+@@ -165,7 +165,8 @@
+   public static void readExternal(@NotNull Object data, Element parentNode) throws InvalidDataException{
+     if (parentNode == null) return;
+
+-    for (Element e : parentNode.getChildren("option")) {
++    for (Object eTmp : parentNode.getChildren("option")) {
++      Element e = (Element) eTmp;
+       String fieldName = e.getAttributeValue("name");
+       if (fieldName == null) {
+         throw new InvalidDataException();
+--- a/platform/util/src/com/intellij/openapi/util/JDOMExternalizerUtil.java
++++ a/platform/util/src/com/intellij/openapi/util/JDOMExternalizerUtil.java
+@@ -52,6 +52,7 @@
+   @Nullable
+   public static String readField(@NotNull Element parent, @NotNull @NonNls String fieldName) {
+-    for (Element element : parent.getChildren("option")) {
++    for (Object elementTmp : parent.getChildren("option")) {
++      Element element = (Element) elementTmp;
+       String childName = element.getAttributeValue("name");
+       if (Comparing.strEqual(childName, fieldName)) {
+         return element.getAttributeValue("value");
+@@ -61,7 +62,8 @@
+   }
+
+   public static Element getOption(@NotNull Element parent, @NotNull @NonNls String fieldName) {
+-    for (Element element : parent.getChildren("option")) {
++    for (Object elementTmp : parent.getChildren("option")) {
++      Element element = (Element) elementTmp;
+       String childName = element.getAttributeValue("name");
+       if (Comparing.strEqual(childName, fieldName)) {
+         return element;

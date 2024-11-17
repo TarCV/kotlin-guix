@@ -1,0 +1,33 @@
+--- a/compiler/frontend/src/org/jetbrains/kotlin/script/scriptConfig.kt
++++ b/compiler/frontend/src/org/jetbrains/kotlin/script/scriptConfig.kt
+@@ -42,12 +42,12 @@
+ fun loadScriptConfigs(configFile: File): List<KotlinScriptConfig> =
+         JDOMUtil.loadDocument(configFile).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptConfig::class.java)
+         }
+
+ @Suppress("unused") // Used externally
+ fun loadScriptConfigs(configStream: InputStream): List<KotlinScriptConfig> =
+         JDOMUtil.loadDocument(configStream).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptConfig::class.java)
+         }
+
+ @Suppress("unused")
+--- a/compiler/frontend/src/org/jetbrains/kotlin/script/scriptExternalDependenciesConfig.kt
++++ b/compiler/frontend/src/org/jetbrains/kotlin/script/scriptExternalDependenciesConfig.kt
+@@ -44,11 +44,11 @@
+ fun loadScriptExternalImportConfigs(configFile: File): List<KotlinScriptExternalDependenciesConfig> =
+         JDOMUtil.loadDocument(configFile).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptExternalDependenciesConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptExternalDependenciesConfig::class.java)
+         }
+
+ fun loadScriptExternalImportConfigs(configStream: InputStream): List<KotlinScriptExternalDependenciesConfig> =
+         JDOMUtil.loadDocument(configStream).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptExternalDependenciesConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptExternalDependenciesConfig::class.java)
+         }
+
+ fun <TF> getScriptDependenciesFromConfig(file: TF): KotlinScriptExternalDependencies? {

@@ -1,0 +1,19 @@
+--- a/java/java-psi-impl/src/com/intellij/codeInsight/ExceptionUtil.java
++++ a/java/java-psi-impl/src/com/intellij/codeInsight/ExceptionUtil.java
+@@ -32,7 +32,6 @@
+ import com.intellij.util.SmartList;
+ import com.intellij.util.containers.ContainerUtil;
+ import gnu.trove.THashSet;
+-import one.util.streamex.StreamEx;
+ import org.jetbrains.annotations.NonNls;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -118,7 +118,7 @@
+       public void visitThrowStatement(PsiThrowStatement statement) {
+         final PsiExpression expr = statement.getException();
+         if (expr != null) {
+-          addExceptions(result, StreamEx.of(getPreciseThrowTypes(expr)).select(PsiClassType.class).toList());
++          addExceptions(result, getPreciseThrowTypes(expr).stream().filter(e -> e instanceof PsiClassType).map(e -> (PsiClassType) e).collect(java.util.stream.Collectors.toList()));
+         }
+         super.visitThrowStatement(statement);
+       }

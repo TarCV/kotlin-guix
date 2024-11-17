@@ -1,0 +1,33 @@
+--- a/compiler/frontend/src/org/jetbrains/kotlin/script/scriptConfig.kt
++++ b/compiler/frontend/src/org/jetbrains/kotlin/script/scriptConfig.kt
+@@ -42,12 +42,12 @@
+ fun loadScriptConfigs(configFile: File): List<KotlinScriptConfig> =
+         JDOMUtil.loadDocument(configFile).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptConfig::class.java)
+         }
+
+ @Suppress("unused") // Used externally
+ fun loadScriptConfigs(configStream: InputStream): List<KotlinScriptConfig> =
+         JDOMUtil.loadDocument(configStream).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptConfig::class.java)
+         }
+
+ @Suppress("unused")
+--- a/compiler/frontend/src/org/jetbrains/kotlin/script/scriptExtraImports.kt
++++ b/compiler/frontend/src/org/jetbrains/kotlin/script/scriptExtraImports.kt
+@@ -48,11 +48,11 @@
+ fun loadScriptExtraImportConfigs(configFile: File): List<KotlinScriptExtraImportConfig> =
+         JDOMUtil.loadDocument(configFile).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptExtraImportConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptExtraImportConfig::class.java)
+         }
+
+ fun loadScriptExtraImportConfigs(configStream: InputStream): List<KotlinScriptExtraImportConfig> =
+         JDOMUtil.loadDocument(configStream).rootElement.children.mapNotNull {
+-            XmlSerializer.deserialize(it, KotlinScriptExtraImportConfig::class.java)
++            XmlSerializer.deserialize(it as org.jdom.Element, KotlinScriptExtraImportConfig::class.java)
+         }
+
+ class KotlinScriptExtraImportFromConfig(val config : KotlinScriptExtraImportConfig, val envVars: Map<String, List<String>>) :

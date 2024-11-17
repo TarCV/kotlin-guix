@@ -1,0 +1,11 @@
+--- a/java/java-psi-impl/src/com/intellij/psi/impl/compiled/ClsParsingUtil.java
++++ b/java/java-psi-impl/src/com/intellij/psi/impl/compiled/ClsParsingUtil.java
+@@ -200,7 +200,7 @@
+       case Opcodes.V1_8:
+         return LanguageLevel.JDK_1_8;
+
+-      case Opcodes.V1_9:
++      case Opcodes.V9:
+         return LanguageLevel.JDK_1_9;
+
+       default:

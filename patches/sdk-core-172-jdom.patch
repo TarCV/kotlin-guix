@@ -1,0 +1,24 @@
+--- a/platform/core-impl/src/com/intellij/ide/plugins/IdeaPluginDescriptorImpl.java
++++ b/platform/core-impl/src/com/intellij/ide/plugins/IdeaPluginDescriptorImpl.java
+@@ -131,6 +131,7 @@
+     List<Element> result = new SmartList<Element>();
+     for (Element extensionsRoot : elements) {
+-      for (Element element : extensionsRoot.getChildren()) {
++      for (Object elementTmp : extensionsRoot.getChildren()) {
++        Element element = (Element) elementTmp;
+         JDOMUtil.internElement(element, interner);
+         result.add(element);
+       }
+--- a/platform/extensions/src/com/intellij/openapi/extensions/impl/ExtensionsAreaImpl.java
++++ b/platform/extensions/src/com/intellij/openapi/extensions/impl/ExtensionsAreaImpl.java
+@@ -159,8 +159,8 @@
+     // has content
+     if (!extensionElement.getContent().isEmpty()) return true;
+     // has custom attributes
+-    for (Attribute attribute : extensionElement.getAttributes()) {
++    for (Object attribute : extensionElement.getAttributes()) {
+-      final String name = attribute.getName();
++      final String name = ((Attribute)attribute).getName();
+       if (!"implementation".equals(name) && !"id".equals(name) && !"order".equals(name)) {
+         return true;
+       }

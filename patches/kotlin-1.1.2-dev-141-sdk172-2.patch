@@ -1,0 +1,25 @@
+Index: compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/KotlinCoreProjectEnvironment.kt
+Undo the fix conflicting with a similar fix already present in IntelliJ SDK 172
+===================================================================
+diff --git a/compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/KotlinCoreProjectEnvironment.kt b/compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/KotlinCoreProjectEnvironment.kt
+--- a/compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/KotlinCoreProjectEnvironment.kt	(revision 3a3cf048a6c0320add66c109e178cd55411957ce)
++++ b/compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/KotlinCoreProjectEnvironment.kt	(revision f0e890797a3f46a9f09d698a5f32daba35c2d631)
+@@ -20,17 +20,10 @@
+ import com.intellij.core.JavaCoreProjectEnvironment
+ import com.intellij.openapi.Disposable
+ import com.intellij.psi.PsiManager
+-import com.intellij.psi.controlFlow.ControlFlowFactory
+ 
+ open class KotlinCoreProjectEnvironment(
+         disposable: Disposable,
+         applicationEnvironment: JavaCoreApplicationEnvironment
+ ) : JavaCoreProjectEnvironment(disposable, applicationEnvironment) {
+-    init {
+-        myProject.registerService<ControlFlowFactory>(ControlFlowFactory::class.java,
+-                                                      ControlFlowFactory(myPsiManager))
+-
+-    }
+-
+     override fun createCoreFileManager() = KotlinCliJavaFileManagerImpl(PsiManager.getInstance(project))
+ }
+\ No newline at end of file

@@ -1,0 +1,22 @@
+--- a/compiler/daemon/src/org/jetbrains/kotlin/daemon/KotlinCompileDaemon.kt
++++ b/compiler/daemon/src/org/jetbrains/kotlin/daemon/KotlinCompileDaemon.kt
+@@ -17,7 +17,6 @@
+ package org.jetbrains.kotlin.rmi.service
+
+ import org.jetbrains.kotlin.cli.common.CLICompiler
+-import org.jetbrains.kotlin.cli.js.K2JSCompiler
+ import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+ import org.jetbrains.kotlin.rmi.*
+ import java.io.File
+@@ -123,10 +123,9 @@
+             val compilerSelector = object : CompilerSelector {
+                 private val jvm by lazy { K2JVMCompiler() }
+-                private val js by lazy { K2JSCompiler() }
+                 private val metadata by lazy { K2MetadataCompiler() }
+                 override fun get(targetPlatform: CompileService.TargetPlatform): CLICompiler<*> = when (targetPlatform) {
+                     CompileService.TargetPlatform.JVM -> jvm
+-                    CompileService.TargetPlatform.JS -> js
++                    CompileService.TargetPlatform.JS -> TODO()
+                     CompileService.TargetPlatform.METADATA -> metadata
+                 }
+             }

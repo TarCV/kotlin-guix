@@ -1,0 +1,12 @@
+--- a/compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/MockExternalAnnotationsManager.kt
++++ b/compiler/cli/src/org/jetbrains/kotlin/cli/jvm/compiler/MockExternalAnnotationsManager.kt
+@@ -29,6 +29,9 @@
+     override fun findExternalAnnotation(listOwner: PsiModifierListOwner, annotationFQN: String): PsiAnnotation? = null
+     override fun findExternalAnnotations(listOwner: PsiModifierListOwner): Array<out PsiAnnotation>? = null
+
++    override fun hasAnnotationRootsForFile(p0: com.intellij.openapi.vfs.VirtualFile): Boolean {
++        throw UnsupportedOperationException("not implemented")
++    }
+     override fun annotateExternally(listOwner: PsiModifierListOwner, annotationFQName: String, fromFile: PsiFile, value: Array<out PsiNameValuePair>?) {
+         throw UnsupportedOperationException("not implemented")
+     }

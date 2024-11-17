@@ -1,0 +1,63 @@
+--- a/platform/util/src/com/intellij/util/ImageLoader.java
++++ b/platform/util/src/com/intellij/util/ImageLoader.java
+@@ -25,7 +25,6 @@
+ import com.intellij.util.ui.ImageUtil;
+ import com.intellij.util.ui.JBUI;
+ import com.intellij.util.ui.UIUtil;
+-import org.imgscalr.Scalr;
+ import org.jetbrains.annotations.NonNls;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -53,11 +53,6 @@
+     public enum Type {
+       PNG,
+
+-      SVG {
+-        @Override
+-        public Image load(URL url, InputStream is, float scale) throws IOException {
+-          return SVGLoader.load(url, is, scale);
+-        }
+-      },
++      SVG,
+
+       UNDEFINED;
+@@ -331,12 +330,7 @@
+     if (w <= 0 || h <= 0) {
+       return image;
+     }
+-    int width = (int)(scale * w);
+-    int height = (int)(scale * h);
+-    // Using "QUALITY" instead of "ULTRA_QUALITY" results in images that are less blurry
+-    // because ultra quality performs a few more passes when scaling, which introduces blurriness
+-    // when the scaling factor is relatively small (i.e. <= 3.0f) -- which is the case here.
+-    return Scalr.resize(ImageUtil.toBufferedImage(image), Scalr.Method.QUALITY, width, height);
++    return image;
+   }
+
+   @Nullable
+--- a/platform/util/src/com/intellij/util/JBHiDPIScaledImage.java
++++ b/platform/util/src/com/intellij/util/JBHiDPIScaledImage.java
+@@ -18,5 +18,4 @@
+ import com.intellij.util.ui.ImageUtil;
+ import com.intellij.util.ui.JBUI;
+-import org.imgscalr.Scalr;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -112,17 +111,10 @@
+     int h = (int)(scaleFactor * getRealHeight(null));
+     if (w <= 0 || h <= 0) return this;
+
+-    Image scaled = Scalr.resize(ImageUtil.toBufferedImage(img), Scalr.Method.QUALITY, w, h);
+
+     int newUserWidth = (int)(w / this.myScale);
+     int newUserHeight = (int)(h / this.myScale);
+
+-    if (myImage != null) {
+-      return new JBHiDPIScaledImage(scaled, newUserWidth, newUserHeight, getType());
+-    }
+     JBHiDPIScaledImage newImg = new JBHiDPIScaledImage(newUserWidth, newUserHeight, getType());
+-    Graphics2D g = newImg.createGraphics();
+-    g.drawImage(scaled, 0, 0, newUserWidth, newUserHeight, 0, 0, scaled.getWidth(null), scaled.getHeight(null), null);
+-    g.dispose();
+     return newImg;
+   }

@@ -1,0 +1,22 @@
+--- a/compiler/daemon/src/org/jetbrains/kotlin/daemon/KotlinCompileDaemon.kt
++++ b/compiler/daemon/src/org/jetbrains/kotlin/daemon/KotlinCompileDaemon.kt
+@@ -18,7 +18,6 @@
+
+ import org.jetbrains.kotlin.cli.common.CLICompiler
+ import org.jetbrains.kotlin.cli.common.environment.setIdeaIoUseFallback
+-import org.jetbrains.kotlin.cli.js.K2JSCompiler
+ import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+ import org.jetbrains.kotlin.cli.metadata.K2MetadataCompiler
+ import org.jetbrains.kotlin.daemon.common.*
+@@ -123,10 +123,9 @@
+             val compilerSelector = object : CompilerSelector {
+                 private val jvm by lazy { K2JVMCompiler() }
+-                private val js by lazy { K2JSCompiler() }
+                 private val metadata by lazy { K2MetadataCompiler() }
+                 override fun get(targetPlatform: CompileService.TargetPlatform): CLICompiler<*> = when (targetPlatform) {
+                     CompileService.TargetPlatform.JVM -> jvm
+-                    CompileService.TargetPlatform.JS -> js
++                    CompileService.TargetPlatform.JS -> TODO()
+                     CompileService.TargetPlatform.METADATA -> metadata
+                 }
+             }
