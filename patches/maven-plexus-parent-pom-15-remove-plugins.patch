@@ -1,0 +1,41 @@
+--- a/pom.xml
++++ b/pom.xml
+@@ -608,13 +608,6 @@
+       <plugin>
+         <groupId>org.apache.maven.plugins</groupId>
+         <artifactId>maven-enforcer-plugin</artifactId>
+-        <dependencies>
+-          <dependency>
+-            <groupId>org.codehaus.mojo</groupId>
+-            <artifactId>extra-enforcer-rules</artifactId>
+-            <version>1.7.0</version>
+-          </dependency>
+-        </dependencies>
+         <executions>
+           <execution>
+             <id>enforce-maven-and-java-bytecode</id>
+@@ -635,24 +635,10 @@
+                   <version>3.2.5</version>
+                   <message>This project requires at least Maven 3.2.5</message>
+                 </requireMavenVersion>
+-                <enforceBytecodeVersion>
+-                  <maxJdkVersion>${maven.compiler.target}</maxJdkVersion>
+-                </enforceBytecodeVersion>
+               </rules>
+             </configuration>
+           </execution>
+         </executions>
+       </plugin>
+-      <plugin>
+-        <artifactId>maven-site-plugin</artifactId>
+-        <executions>
+-          <execution>
+-            <id>attach-descriptor</id>
+-            <goals>
+-              <goal>attach-descriptor</goal>
+-            </goals>
+-          </execution>
+-        </executions>
+-      </plugin>
+     </plugins>
+   </build>

@@ -1,0 +1,20 @@
+--- a/pom.xml
++++ b/pom.xml
+@@ -229,17 +226,6 @@
+       <build>
+         <!--- newer versions of plugins requires JDK 11 -->
+         <plugins>
+-          <plugin>
+-            <groupId>com.diffplug.spotless</groupId>
+-            <artifactId>spotless-maven-plugin</artifactId>
+-          </plugin>
+-          <plugin>
+-            <groupId>org.apache.maven.plugins</groupId>
+-            <artifactId>maven-checkstyle-plugin</artifactId>
+-            <configuration>
+-              <configLocation>${checkstyle.spotless.config}</configLocation>
+-            </configuration>
+-          </plugin>
+         </plugins>
+       </build>
+     </profile>

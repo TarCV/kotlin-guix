@@ -1,0 +1,22 @@
+--- a/pom.xml
++++ b/pom.xml
+@@ -656,19 +656,6 @@
+       <build>
+         <plugins>
+           <!-- if releasing current pom with maven 3 site descriptor must be attached -->
+-          <plugin>
+-            <groupId>org.apache.maven.plugins</groupId>
+-            <artifactId>maven-site-plugin</artifactId>
+-            <inherited>false</inherited>
+-            <executions>
+-              <execution>
+-                <id>attach-descriptor</id>
+-                <goals>
+-                  <goal>attach-descriptor</goal>
+-                </goals>
+-              </execution>
+-            </executions>
+-          </plugin>
+         </plugins>
+       </build>
+     </profile>

@@ -1,0 +1,21 @@
+--- a/src/com/google/javascript/jscomp/testing/NodeSubject.java
++++ b/src/com/google/javascript/jscomp/testing/NodeSubject.java
+@@ -44,6 +44,6 @@
+   public void isEqualTo(Node node) {
+     String treeDiff = node.checkTreeEquals(getSubject());
+     if (treeDiff != null) {
+-      failWithRawMessage("%s", treeDiff);
++      failWithoutActual(com.google.common.truth.Fact.fact("node is different", treeDiff));
+     }
+   }
+--- a/test/com/google/javascript/jscomp/JsdocToEs6TypedConverterTest.java
++++ b/test/com/google/javascript/jscomp/JsdocToEs6TypedConverterTest.java
+@@ -248,7 +248,6 @@
+   private NodeSubject assertParseTypeAndConvert(final String typeExpr) {
+     Node oldAST = JsDocInfoParser.parseTypeString(typeExpr);
+     assertNotNull(typeExpr + " did not produce a parsed AST", oldAST);
+-    return new NodeSubject(THROW_ASSERTION_ERROR,
+-        TypeDeclarationsIRFactory.convertTypeNodeAST(oldAST));
++    return NodeSubject.assertNode(TypeDeclarationsIRFactory.convertTypeNodeAST(oldAST));
+   }
+ }

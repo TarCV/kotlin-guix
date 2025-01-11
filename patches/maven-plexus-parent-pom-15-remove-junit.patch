@@ -1,0 +1,15 @@
+--- a/pom.xml
++++ b/pom.xml
+@@ -358,12 +358,5 @@
+         <version>${mavenPluginToolsVersion}</version>
+         <scope>provided</scope>
+       </dependency>
+-      <dependency>
+-        <groupId>org.junit</groupId>
+-        <artifactId>junit-bom</artifactId>
+-        <version>${junit5Version}</version>
+-        <type>pom</type>
+-        <scope>import</scope>
+-      </dependency>
+     </dependencies>
+   </dependencyManagement>

@@ -1,0 +1,80 @@
+--- a/core/pom.xml
++++ b/core/pom.xml
+@@ -23,20 +23,10 @@
+       <artifactId>junit</artifactId>
+     </dependency>
+     <!-- Required only to test the -gwt sub-artifact. -->
+-    <dependency>
+-      <groupId>org.gwtproject</groupId>
+-      <artifactId>gwt-user</artifactId>
+-      <scope>test</scope>
+-    </dependency>
+     <dependency>
+       <groupId>com.google.auto.value</groupId>
+       <artifactId>auto-value-annotations</artifactId>
+     </dependency>
+-    <dependency>
+-      <groupId>com.google.guava</groupId>
+-      <artifactId>guava-gwt</artifactId>
+-      <scope>test</scope>
+-    </dependency>
+     <dependency>
+       <groupId>com.google.guava</groupId>
+       <artifactId>guava-testlib</artifactId>
+@@ -94,15 +94,6 @@
+           </annotationProcessorPaths>
+         </configuration>
+       </plugin>
+-      <plugin>
+-        <artifactId>maven-source-plugin</artifactId>
+-        <configuration>
+-          <excludes>
+-            <exclude>**/super/**</exclude>
+-            <exclude>**/*.gwt.xml</exclude>
+-          </excludes>
+-        </configuration>
+-      </plugin>
+       <plugin>
+         <artifactId>maven-jar-plugin</artifactId>
+         <executions>
+@@ -117,10 +117,6 @@
+           </execution>
+         </executions>
+       </plugin>
+-      <plugin>
+-        <groupId>org.codehaus.mojo</groupId>
+-        <artifactId>animal-sniffer-maven-plugin</artifactId>
+-      </plugin>
+       <plugin>
+         <artifactId>maven-surefire-plugin</artifactId>
+         <configuration>
+@@ -129,29 +129,6 @@
+           </excludes>
+         </configuration>
+       </plugin>
+-      <plugin>
+-        <groupId>org.codehaus.mojo</groupId>
+-        <artifactId>gwt-maven-plugin</artifactId>
+-        <executions>
+-          <execution>
+-            <id>gwt-test</id>
+-            <goals><goal>test</goal></goals>
+-            <configuration>
+-              <mode>htmlunit</mode>
+-              <htmlunit>FF</htmlunit>
+-              <productionMode>true</productionMode>
+-              <!-- Fix OutOfMemoryError in Travis. -->
+-              <extraJvmArgs>-Xms3500m -Xmx3500m -Xss1024k</extraJvmArgs>
+-              <sourceLevel>auto</sourceLevel>
+-              <userAgents>gecko1_8</userAgents>
+-              <includes>**/*GwtTest.java</includes>
+-              <!-- Keep these timeouts very large because, if we hit the timeout, the tests silently pass :( -->
+-              <testTimeOut>86400 <!-- seconds --></testTimeOut>
+-              <testMethodTimeout>1440 <!-- minutes --></testMethodTimeout>
+-            </configuration>
+-          </execution>
+-        </executions>
+-      </plugin>
+       <!-- We need to strip "@Nullable" from the sources that we hand to GWT:
+            b/183648616. To do that, we have to make a copy of the original
+            source directory and add that directory as a Maven source root. But

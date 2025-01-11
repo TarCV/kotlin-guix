@@ -1,0 +1,30 @@
+--- a/compiler/daemon/src/org/jetbrains/kotlin/daemon/CompileServiceImpl.kt
++++ b/compiler/daemon/src/org/jetbrains/kotlin/daemon/CompileServiceImpl.kt
+@@ -36,7 +36,6 @@
+ import org.jetbrains.kotlin.cli.common.repl.ReplCodeLine
+ import org.jetbrains.kotlin.cli.common.repl.ReplCompileResult
+ import org.jetbrains.kotlin.cli.common.repl.ReplEvalResult
+-import org.jetbrains.kotlin.cli.js.K2JSCompiler
+ import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+ import org.jetbrains.kotlin.cli.metadata.K2MetadataCompiler
+@@ -329,7 +328,7 @@
+         val k2PlatformArgs = try {
+             when (targetPlatform) {
+                 CompileService.TargetPlatform.JVM -> K2JVMCompilerArguments().apply { K2JVMCompiler().parseArguments(compilerArguments, this) }
+-                CompileService.TargetPlatform.JS -> K2JSCompilerArguments().apply { K2JSCompiler().parseArguments(compilerArguments, this) }
++                CompileService.TargetPlatform.JS -> TODO()
+                 CompileService.TargetPlatform.METADATA -> K2MetadataCompilerArguments().apply { K2MetadataCompiler().parseArguments(compilerArguments, this) }
+             }
+         }
+@@ -383,9 +382,7 @@
+                 CompileService.TargetPlatform.JVM -> {
+                     K2JVMCompiler().exec(messageCollector, services, args as K2JVMCompilerArguments)
+                 }
+-                CompileService.TargetPlatform.JS -> {
+-                    K2JSCompiler().exec(messageCollector, services, args as K2JSCompilerArguments)
+-                }
++                CompileService.TargetPlatform.JS -> TODO()
+                 CompileService.TargetPlatform.METADATA -> {
+                     K2MetadataCompiler().exec(messageCollector, services, args as K2MetadataCompilerArguments)
+                 }

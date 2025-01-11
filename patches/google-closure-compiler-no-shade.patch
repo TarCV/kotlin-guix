@@ -1,0 +1,14 @@
+--- a/build.xml
++++ b/build.xml
+@@ -186,11 +186,6 @@
+           description="package compiler as an executable jar">
+     <jar destfile="${compiler-jarfile}" update="true">
+       <fileset dir="${classes.dir}" />
+-      <zipfileset src="${lib.dir}/args4j.jar"/>
+-      <zipfileset src="${lib.dir}/guava.jar"/>
+-      <zipfileset src="${lib.dir}/gson.jar"/>
+-      <zipfileset src="${lib.dir}/jsr305.jar"/>
+-      <zipfileset src="${lib.dir}/protobuf-java.jar"/>
+
+       <manifest>
+         <attribute name="Main-Class"

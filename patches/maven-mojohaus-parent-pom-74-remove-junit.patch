@@ -1,0 +1,16 @@
+--- a/pom.xml
++++ b/pom.xml
+@@ -269,13 +269,6 @@
+         <version>4.13.2</version>
+         <scope>test</scope>
+       </dependency>
+-      <dependency>
+-        <groupId>org.junit</groupId>
+-        <artifactId>junit-bom</artifactId>
+-        <version>${junit5.version}</version>
+-        <type>pom</type>
+-        <scope>import</scope>
+-      </dependency>
+       <dependency>
+         <groupId>org.apache.maven.plugin-tools</groupId>
+         <artifactId>maven-plugin-annotations</artifactId>
