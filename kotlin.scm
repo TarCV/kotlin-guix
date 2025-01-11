@@ -1,4 +1,4 @@
-;;;    Copyright 2024 TarCV
+;;;    Copyright 2024-2025 TarCV
 ;;;    Copyright 2023 Emmanuel Bourg, Julien Lepiller
 ;;;
 ;;;   Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,18 +19,19 @@
                 #:prefix license:)
   #:use-module (gnu packages)
   #:use-module (guix build-system ant)
+  #:use-module (guix build-system maven)
   #:use-module (guix git-download)
   #:use-module (gnu packages compression)
   #:use-module (gnu packages java-compression)
   #:use-module (gnu packages java-xml)
   #:use-module (gnu packages java)
+  #:use-module (gnu packages node)
   #:use-module (gnu packages protobuf))
 
 ;; TODO: should intellij packages be merged, or their patches be splitted?
 ;; TODO: ensure (find-files "*.jar") finds only a single file
 ;; TODO: fix manifest configuration https://ant.apache.org/manual/Tasks/manifest.html
 ;; TODO: improve jar/zip cleanup
-;; TODO: update ASM 3.1 to latest minor of release 3
 ;; TODO: try using latest ASM, IJ, JDK, etc for non-public kotlin packages
 ;; TODO: add verification that symlink target exists
 ;; TODO: recheck all hashes with guix download
@@ -38,13 +39,12 @@
 ;; TODO: delete unused sources before building
 ;; TODO: try using just the latest intellij, asm, annotations versions
 ;; TODO: avoid using Java 7+ features in public kotlin packages
-;; TODO: change unpack to avoid extracting everything (but how to keep patching?)
 ;; TODO: inherit source in ijsdk packages and other places
 ;; TODO: remove unused packages
 ;; TODO: refactor bootstrap chains using folding
-;; TODO: compare ijsdk-172 inputs and its vendored libs versions
-; TODO: is jansi-native actually needed?
-; TODO: should compiler dependencies be kept shaded in guix?
+;; TODO: is jansi-native actually needed?
+;; TODO: remove jar shading
+;; TODO: force hash -maps and -sets to use random iteration order to ensure reproducibility
 
 (define (link-input-jars target-dir package-names)
   `(lambda* (#:key inputs #:allow-other-keys)
@@ -368,6 +368,55 @@ available.")
        (sha256
         (base32 "0xxn9gxhvsgzz2sgmihzf6pf75clr05mqj6218camwrwajpcbgqk"))))))
 
+; TODO: somehow inherit from protobuf
+(define-public java-protobuf-api
+  (package
+    (name "java-protobuf-api")
+    (version "3.21.9") ; same version as protoc
+    (properties '((upstream-name . "protobuf")))
+    (source
+      (origin
+        (method url-fetch)
+        ; TODO: This is probably a generated archive, replace it with the actual source once Guix has Bazel build system
+        (uri (string-append "https://github.com/protocolbuffers/protobuf/releases/"
+               "download/v"
+               (substring version 2)
+               "/protobuf-java-"
+               version
+               ".tar.gz"))
+        (sha256
+          (base32 "14kcmxrcrkfgv2wndqi1h2g3045kvis7pwm1dcrhvf3hmi5xizr7"))))
+    (native-inputs (list ant
+                         java-cglib
+                         java-easymock-3.2
+                         java-easymock-class-extension
+                         java-junit
+                         java-objenesis
+                         protobuf))
+    (build-system ant-build-system) ; TODO: replace with Maven
+    (arguments
+      `(#:jar-name "protobuf.jar"
+         #:source-dir "java/core/src/main"
+         #:tests? #f ; Tests depend on Google Truth library that is hard to package
+         #:phases ,#~(modify-phases %standard-phases
+                       (add-before 'build 'generate-sources
+                         (lambda* (#:key inputs #:allow-other-keys)
+                           (invoke
+                             (string-append (assoc-ref inputs "ant") "/bin/ant")
+                             (string-append "-Dprotoc=" (assoc-ref inputs "protobuf") "/bin/protoc")
+                             "-Dgenerated.sources.dir=src/main/java"
+                             "-Dprotobuf.source.dir=../../src"
+                             "-buildfile" "java/core/generate-sources-build.xml"))))))
+    (home-page "https://protobuf.dev/")
+    (synopsis
+      "Java API for Protocol buffers - data encoding for remote procedure calls (RPCs)")
+    (description
+      "Protocol Buffers are a way of encoding structured data in an efficient
+       yet extensible format.  Google uses Protocol Buffers for almost all of its
+       internal RPC protocols and file formats.  This package contains Java API.")
+    (license license:bsd-3)))
+
+; TODO: inherit this package from java-protobuf-api
 ;; This is the latest version not requiring clients to know about StringLists
 (define-public java-protobuf-api-2.5
   (package
@@ -3102,7 +3151,7 @@ available.")
                               ))
                           (symlink (string-append (assoc-ref inputs
                                                     "java-native-access")
-                                     "/share/java/jna.jar")
+                                     "/share/java/jna-min.jar")
                             "ideaSDK/core/jna.jar"))
                       )))))
 
@@ -3120,7 +3169,304 @@ available.")
                    `(modify-phases ,inherited-phases
                       (add-before 'build 'set-jdk-variables
                         (lambda _
-                          (setenv "JDK_16" ,(gexp-input icedtea-7 "jdk"))))))
-    ))
+                          (setenv "JDK_16" ,(gexp-input icedtea-7 "jdk"))))
+                      (delete 'remove-js-compiler)))))
 
-kotlin-1.1.2-5-bootstrap
+(define-public java-jspecify
+  (package
+    (name "java-jspecify")
+    (version "1.0.0")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/jspecify/jspecify.git")
+               (commit (string-append "v" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1vrn2r5dl8sqny7zhaqsg6qm8yyd3rjl2fn3g168i5dxd5l521as"))))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "jspecify.jar"
+        #:jdk ,openjdk ; required for J9+ specific annotations
+        #:source-dir "src/main/java"
+        #:make-flags (list "-Dant.build.javac.source=1.8" "-Dant.build.javac.target=1.8")
+        #:tests? #f ;tests depend on JUnit 5 which is not packaged in Guix
+        #:phases (modify-phases %standard-phases
+                    (add-before 'build 'remove-j9 ; TODO: How to include these sources properly?
+                      (lambda _
+                        (delete-file
+                          "src/java9/java/module-info.java")))
+                   (add-before 'build 'remove-gradle-jars
+                      (lambda _
+                        (delete-file-recursively "gradle"))))))
+    (home-page "https://jspecify.dev/")
+    (synopsis "Standard Annotations for Java Static Analysis")
+    (description "An artifact of well-specified annotations to power static analysis checks and JVM language interop..")
+    (license license:asl2.0)))
+
+(define java-auto-service
+  (package
+    (name "java-auto-service")
+    (version "1.1.1")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/google/auto.git")
+               (commit (string-append "auto-service-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1ds7ik2nqsz6kin7bzj0gy268wv60whs2jiinm5v84ggxpb7igxn"))))
+    (build-system ant-build-system)
+    (inputs (list java-jspecify))
+    (propagated-inputs
+      (list java-guava java-poet))
+    (arguments
+      `(#:jar-name "auto-service.jar"
+         #:source-dir "prepared"
+         #:make-flags (list "-Dant.build.javac.target=1.8")
+         #:tests? #f ; TODO
+         #:phases ,#~(modify-phases %standard-phases
+                       (add-before 'build 'prepare-resources
+                         (lambda _
+                           (for-each
+                             (lambda (f) (copy-file f "classes"))
+                             (find-files "value/src/main/java" ".*\\.vm$"))))
+                       (add-before 'build 'prepare-sources
+                         (lambda _
+                           (copy-recursively "common/src/main/java" "prepared")
+                           (copy-recursively "service/annotations/src/main/java" "prepared")
+                           (copy-recursively "service/processor/src/main" "prepared")))
+                       (add-after 'prepare-sources 'jspecify-annotations
+                         (lambda _
+                           (substitute* (find-files "prepared" "\\.java$")
+                             (("org.checkerframework.checker.nullness.qual.Nullable") "org.jspecify.annotations.Nullable")))))))
+    (home-page "https://github.com/google/auto/tree/main/service")
+    (synopsis "A configuration/metadata generator for java.util.ServiceLoader-style service providers")
+    (description "AutoService generates this metadata for the developer, for any class annotated with @AutoService, avoiding typos, providing resistance to errors from refactoring, etc.")
+    (license license:asl2.0)))
+
+(define java-gradle-incap
+  (package
+    (name "java-gradle-incap")
+    (version "1.0.0")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/tbroyer/gradle-incap-helper.git")
+               (commit (string-append "v" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "17kbbl2w1glddvdvz6bk113figms4qj5pvh00kcrcbw66wnj40s6"))))
+    (build-system ant-build-system)
+    (native-inputs (list java-auto-service))
+    (arguments
+      `(#:jar-name "gradle-incap.jar"
+        #:source-dir "prepared"
+        #:tests? #f ; TODO
+        #:phases ,#~(modify-phases %standard-phases
+                      (add-before 'build 'prepare-resources
+                        (lambda _
+                          (copy-recursively "processor/src/main/resources" "classes")))
+                      (add-before 'build 'prepare-sources
+                        (lambda _
+                          (copy-recursively "lib/src/main/java" "prepared")
+                          (copy-recursively "processor/src/main/java" "prepared"))))))
+    (home-page "https://github.com/tbroyer/gradle-incap-helper")
+    (synopsis "Helper library and annotation processor for building incremental annotation processors")
+    (description "This library and annotation processor helps you generate the META-INF descriptor, and return the appropriate value from your processor's getSupportedOptions() if it's dynamic.")
+    (license license:asl2.0)))
+
+(define java-escapevelocity
+  (package
+    (name "java-escapevelocity")
+    (version "1.1")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/google/escapevelocity.git")
+               (commit (string-append "escapevelocity-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1svgwhnnd6cq18xs699a2z6n4hxczbi25jc8srpszc7582cwv829"))))
+    (build-system ant-build-system)
+    (native-inputs (list java-auto-service))
+    (arguments
+      `(#:jar-name "escape-velocity.jar"
+        #:source-dir "src/main"
+        #:tests? #f)) ; TODO: add tests when Guix has Apache Velocity packaged
+    (home-page "https://github.com/google/escapevelocity")
+    (synopsis "A subset reimplementation of Apache Velocity with a much simpler API")
+    (description "EscapeVelocity is a templating engine that can be used from Java. It is a reimplementation of a subset of functionality from Apache Velocity. EscapeVelocity has no facilities for HTML escaping and it is not appropriate for producing HTML output that might include portions of untrusted input.")
+    (license license:asl2.0)))
+
+(define java-truth
+  (package
+    (name "java-truth")
+    (version "1.4.4")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/google/truth.git")
+               (commit (string-append "v" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "13fmzmsmkjdxxrmm0xvlzj5kmvwdgalx4hnqc7wqjkhhxdgxdvch"))))
+    (inputs (list java-jspecify))
+    (propagated-inputs (list java-guava))
+    (build-system maven-build-system)
+    (home-page "https://truth.dev/")
+    (synopsis "Fluent assertions for Java and Android")
+    (description "Truth makes your test assertions and failure messages more readable. Similar to AssertJ, it natively supports many JDK and Guava types, and it is extensible to others.")
+    (license license:asl2.0)))
+
+(define java-poet
+  (package
+    (name "java-poet")
+    (version "1.13.0")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/square/javapoet.git")
+               (commit (string-append "javapoet-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1q4faw7mpzgjw8lfs39qs36n8i2a5drg3r89wn0xb2s569jvqg9y"))))
+    (inputs java-truth)
+    (build-system maven-build-system)
+    (home-page "https://github.com/square/javapoet")
+    (synopsis "A Java API for generating .java source files")
+    (description "Source file generation can be useful when doing things such as annotation processing or interacting with metadata files (e.g., database schemas, protocol formats). By generating code, you eliminate the need to write boilerplate while also keeping a single source of truth for the metadata.")
+    (license license:asl2.0)))
+
+(define java-auto-value
+  (package
+    (name "java-auto-value")
+    (version "1.11.0")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/google/auto.git")
+               (commit (string-append "auto-value-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "14p23vwv1bc8qrk5yrgx0x567dj4if81qq6hcfy4bnxm3k85prcj"))))
+    (build-system ant-build-system)
+    (inputs (list java-auto-service java-error-prone-annotations java-jspecify))
+    (propagated-inputs
+      (list java-asm-9 java-escapevelocity java-guava java-gradle-incap java-poet))
+    (arguments
+      `(#:jar-name "auto-value.jar"
+        #:source-dir "prepared"
+        #:phases ,#~(modify-phases %standard-phases
+                      (add-before 'build 'prepare-resources
+                        (lambda _
+                          (mkdir-p "classes")
+                          (for-each
+                            (lambda (f) (copy-file f (string-append "classes/" (basename f))))
+                            (find-files "value/src/main/java" ".*\\.vm$"))))
+                      (add-before 'build 'prepare-sources
+                        (lambda _
+                          (copy-recursively "common/src/main/java" "prepared/common")
+                          (for-each
+                            (lambda (d)
+                              (copy-recursively
+                                (string-append "value/src/main/java/com/google/auto/value/" d)
+                                (string-append "prepared/" d)))
+                            (list
+                              "processor"
+                              "extension/memoized/processor"
+                              "extension/serializable/processor"
+                              "extension/serializable/serializer"
+                              "extension/toprettystring/processor"))))
+                      (add-after 'prepare-sources 'jspecify-annotations
+                        (lambda _
+                          (substitute* (find-files "prepared" "\\.java$")
+                            (("org.checkerframework.checker.nullness.qual.Nullable") "org.jspecify.annotations.Nullable")))))))
+    (home-page "https://github.com/google/auto/tree/main/value")
+    (synopsis "Generate immutable value classes for Java 8+")
+    (description "AutoValue provides an easier way to create immutable value classes, with a lot less code and less room for error, while not restricting your freedom to code almost any aspect of your class exactly the way you want it.")
+    (license license:asl2.0)))
+
+(define google-closure-compiler
+  (package
+    (name "google-closure-compiler")
+    (version "20240317")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/google/closure-compiler.git")
+               (commit (string-append "v" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0pdwggiwymk2in1kk8kxwa92422naqrfarb5zvwmjmqd21587zqf"))))
+    (native-inputs (list java-error-prone-annotations java-jspecify node protobuf))
+    (propagated-inputs
+      (list java-args4j java-gson java-guava java-protobuf-api))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "closure-compiler-unshaded.jar"
+        #:phases (modify-phases %standard-phases
+          (add-before 'build 'fix-jspecify-package
+            (lambda _
+              (substitute* (find-files "src" ".*\\.java$")
+                (("org.jspecify.nullness") "org.jspecify.annotations"))))
+          (add-before 'build 'remove-super-sourced-classes
+            (lambda _
+              (delete-file-recursively "src/com/google/debugging/sourcemap/super")
+              (delete-file-recursively "src/com/google/javascript/jscomp/j2clbuild/super")
+              (delete-file-recursively "src/com/google/javascript/rhino/testing/super-j2cl")))
+          (add-before 'build 'generate-sources
+            (lambda* (#:key inputs #:allow-other-keys)
+              (invoke (string-append (assoc-ref inputs "protobuf")
+                        "/bin/protoc")
+                "--java_out=src"
+                "--proto_path=src"
+                "src/com/google/debugging/sourcemap/proto/mapping.proto"))))))
+    (home-page "https://developers.google.com/closure/compiler/")
+    (synopsis "JavaScript optimizing compiler")
+    (description "a tool for making JavaScript download and run faster. Instead of compiling from a source language to machine code, it compiles from JavaScript to better JavaScript. It parses your JavaScript, analyzes it, removes dead code and rewrites and minimizes what's left. It also checks syntax, variable references, and types, and warns about common JavaScript pitfalls.")
+    (license license:asl2.0)))
+
+(define kotlin-1.1.2-5
+  (let ((inherited-package kotlin-1.1.2-5-bootstrap)
+        (version "1.1.2-5")
+        (sha256sum "0lrq7bwds0iaczvs7p3xijlycdcfqgh11sb09b88pl04hwfjx48b"))
+    (package
+      (inherit inherited-package)
+      (version version)
+      (source
+        (origin
+          (inherit (package-source inherited-package))
+          (patches '("patches/kotlin-1.1.2-5-full.patch" "patches/kotlin-0.10.1426-pack-jar.patch"
+             "patches/kotlin-1.1.2-eap-44-pack-jar-2.patch" ; TODO: remove this patch
+             "patches/kotlin-1.1.0-dev-3204-sdk172.patch"
+             "patches/kotlin-1.1.2-dev-141-remove-proguard.patch"))))
+      (arguments
+        `(,@(substitute-keyword-arguments (package-arguments inherited-package)
+              ((#:make-flags make-flags)
+                #~(list
+                    (string-append "-Dkotlin-home=" #$output)
+                    "-Dshrink=false"
+                    (string-append "-Dbuild.number="
+                      #$version)
+                    (string-append "-Dbootstrap.compiler.home="
+                      #$inherited-package)))
+              ((#:phases inherited-phases)
+                   `(modify-phases ,inherited-phases
+                      (add-before 'build 'set-release-mode
+                        (lambda _
+                          (substitute* "build.xml"
+                            (("\\$\\{bootstrap\\.or\\.local\\.build\\}") "false"))))
+                      (add-before 'build 'prepare-idea-lib-javac2
+                        (lambda* (#:key inputs #:allow-other-keys)
+                          (mkdir-p "ideaSDK/lib")
+                          (symlink (string-append
+                                     (assoc-ref inputs "intellij-compiler-javac2")
+                                     "/share/java/intellij-compiler-javac2.jar")
+                            "ideaSDK/lib/javac2.jar")))
+                      (delete 'remove-js-compiler-cli)
+                      (delete 'remove-targets)))))))))
+
+;kotlin-1.1.2-5
+java-truth
+;google-closure-compiler

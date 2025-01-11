@@ -1,0 +1,29 @@
+diff --git a/build.xml b/build.xml
+index b97f49ac19f4..bdd0f8ee7d01 100644
+--- a/build.xml
++++ b/build.xml
+@@ -63,6 +63,7 @@
+         <fileset dir="${basedir}/lib" includes="**/*.jar"/>
+         <fileset dir="${dependencies}" includes="jline3.jar"/>
+         <fileset dir="${dependencies}" includes="jansi.jar"/>
++        <fileset dir="${dependencies}" includes="jansi-native.jar"/>
+         <fileset dir="${dependencies}" includes="javaslang-2.0.6.jar"/>
+         <fileset dir="${dependencies}" includes="json-org.jar"/>
+         <fileset dir="${dependencies}" includes="kotlinx-coroutines-core.jar"/>
+@@ -403,6 +404,7 @@
+                 <zipfileset src="${idea.sdk}/jps/jps-model.jar" excludes="META-INF/services/**"/>
+                 <zipfileset src="${dependencies}/jline3.jar"/>
+                 <zipfileset src="${dependencies}/jansi.jar"/>
++                <zipfileset src="${dependencies}/jansi-native.jar"/>
+                 <zipfileset src="${dependencies}/javaslang-2.0.6.jar"/>
+                 <zipfileset src="${dependencies}/json-org.jar"/>
+                 <zipfileset src="${protobuf.jar}"/>
+@@ -961,7 +963,7 @@
+             depends="gradle-runtime,mock-runtime-for-test"/>
+
+     <target name="other-artifacts"
+-            depends="android-extensions-compiler,allopen-compiler-plugin,noarg-compiler-plugin,sam-with-receiver-compiler-plugin,source-sections-compiler-plugin,annotation-processing,daemon-client,compiler-client-embeddable,kotlin-build-common-test" />
++            depends="annotation-processing,compiler-client-embeddable,kotlin-build-common-test" />
+
+     <target name="dist"
+             depends="clean,init,prepare-dist,preloader,runner,serialize-builtins,compiler-fork,compiler-sources,ant-tools,runtime,other-artifacts"

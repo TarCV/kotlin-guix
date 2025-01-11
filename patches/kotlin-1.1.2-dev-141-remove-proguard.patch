@@ -1,5 +1,5 @@
 --- a/build.xml
-+++ b/build.xml
++++ b/build.xmljavac2
 @@ -1248,13 +1248,12 @@
                  <compilerarg value="kotlin/Metadata"/> <!-- Annotation to strip -->
                  <compilerarg value="kotlin/reflect/jvm/internal/impl/.*"/> <!-- Classes to strip from -->

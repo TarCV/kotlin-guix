@@ -1,0 +1,42 @@
+--- a/build.xml
++++ b/build.xml
+@@ -507,6 +508,7 @@
+                 <zipfileset src="${idea.sdk}/lib/jna-platform.jar"/>
+                 <zipfileset src="${idea.sdk}/lib/oromatcher.jar"/>
+                 <zipfileset src="${idea.sdk}/jps/jps-model.jar"/>
++                <zipfileset src="${dependencies}/jansi.jar"/>
+                 <zipfileset src="${dependencies}/jline.jar"/>
+                 <zipfileset src="${dependencies}/cli-parser-1.1.2.jar"/>
+                 <zipfileset src="${protobuf.jar}"/>
+--- a/compiler/cli/src/org/jetbrains/kotlin/cli/common/messages/PlainTextMessageRenderer.java
++++ b/compiler/cli/src/org/jetbrains/kotlin/cli/common/messages/PlainTextMessageRenderer.java
+@@ -20,6 +20,5 @@
+ import com.intellij.util.LineSeparator;
+ import kotlin.text.StringsKt;
+ import org.fusesource.jansi.Ansi;
+-import org.fusesource.jansi.internal.CLibrary;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -30,21 +29,6 @@
+ import static org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.*;
+
+ public abstract class PlainTextMessageRenderer implements MessageRenderer {
+-    public static final boolean COLOR_ENABLED;
+-
+-    static {
+-        boolean colorEnabled = false;
+-        // TODO: investigate why ANSI escape codes on Windows only work in REPL for some reason
+-        if (!SystemInfo.isWindows && !"false".equals(System.getProperty("kotlin.colors.enabled"))) {
+-            try {
+-                // AnsiConsole doesn't check isatty() for stderr (see https://github.com/fusesource/jansi/pull/35).
+-                colorEnabled = CLibrary.isatty(CLibrary.STDERR_FILENO) != 0;
+-            }
+-            catch (UnsatisfiedLinkError e) {
+-                colorEnabled = false;
+-            }
+-        }
+-        COLOR_ENABLED = colorEnabled;
+-    }
++    public static final boolean COLOR_ENABLED = true;
+
+     private static final String LINE_SEPARATOR = LineSeparator.getSystemLineSeparator().getSeparatorString();
