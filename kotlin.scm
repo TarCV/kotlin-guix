@@ -25,6 +25,8 @@
   #:use-module (gnu packages java-compression)
   #:use-module (gnu packages java-xml)
   #:use-module (gnu packages java)
+  #:use-module (gnu packages maven)
+  #:use-module (gnu packages maven-parent-pom)
   #:use-module (gnu packages node)
   #:use-module (gnu packages protobuf))
 
@@ -45,6 +47,9 @@
 ;; TODO: is jansi-native actually needed?
 ;; TODO: remove jar shading
 ;; TODO: force hash -maps and -sets to use random iteration order to ensure reproducibility
+;; TODO: avoid using ,package form in stages, replace it with (get-*-input "package")
+;; TODO: `#:tests? #f` in maven-build-system should disable testCompile and check tasks
+;; TODO: maven-{antrun,javadoc,source}-plugin, animal-sniffer-maven-plugin for java-truth
 
 (define (link-input-jars target-dir package-names)
   `(lambda* (#:key inputs #:allow-other-keys)
@@ -406,7 +411,9 @@ available.")
                              (string-append "-Dprotoc=" (assoc-ref inputs "protobuf") "/bin/protoc")
                              "-Dgenerated.sources.dir=src/main/java"
                              "-Dprotobuf.source.dir=../../src"
-                             "-buildfile" "java/core/generate-sources-build.xml"))))))
+                             "-buildfile" "java/core/generate-sources-build.xml")))
+                       (replace 'install
+                         (install-from-pom "java/core/pom.xml")))))
     (home-page "https://protobuf.dev/")
     (synopsis
       "Java API for Protocol buffers - data encoding for remote procedure calls (RPCs)")
@@ -707,6 +714,42 @@ available.")
                      (("\\$\\{test\\.home\\}/java")
                       "${test.home}"))))
                (delete 'install-listenablefuture-stub))))))))
+
+(define java-guava-testlib
+  (package
+    (name "java-guava-testlib")
+    (version (package-version java-guava))
+    (source (origin
+              (inherit (package-source java-guava))
+              (patches '("patches/java-guava-testlib.patch"))))
+    (inputs (list java-error-prone-annotations java-checkerframework-qual java-jspecify))
+    (propagated-inputs (list java-junit java-guava))
+    (build-system ant-build-system)
+    (arguments
+      `(#:tests? #f ; Guava tests depend on Truth which has cyclic dependency back on Guava, so tests are disabled for now
+        #:jar-name "guava-testlib.jar"
+        #:source-dir "guava-testlib/src"
+        #:phases (modify-phases %standard-phases
+                   (add-before 'build 'patch-annotations
+                     (lambda _
+                       (substitute* (find-files "guava-testlib/src" "\\.java$")
+                         (("import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;") "")
+                         (("import com.google.common.annotations.GwtCompatible;") "")
+                         (("import com.google.common.annotations.GwtIncompatible;") "")
+                         (("import com.google.j2objc.annotations.J2ObjCIncompatible;") "")
+                         (("@GwtCompatible(\\([^)]+\\))?") "")
+                         (("@GwtIncompatible(\\([^)]+\\))?") "")
+                         (("@J2ObjCIncompatible(\\([^)]+\\))?") ""))))
+                   (add-before 'check 'fix-test-target
+                     (lambda _
+                       (substitute* "build.xml"
+                         (("\\$\\{test\\.home\\}/java")
+                          "${test.home}"))))
+                   (replace 'install (install-from-pom "guava-testlib/pom.xml")))))
+    (home-page "https://github.com/google/guava/tree/master/guava-testlib")
+    (synopsis "Google Testing Libraries for Java")
+    (description "Guava testlib is a set of Java classes for more convenient unit testing.")
+    (license license:asl2.0)))
 
 (define java-javax-inject-java6
   (package
@@ -3172,7 +3215,47 @@ available.")
                           (setenv "JDK_16" ,(gexp-input icedtea-7 "jdk"))))
                       (delete 'remove-js-compiler)))))
 
-(define-public java-jspecify
+(define java-checkerframework-qual
+  (package
+    (name "java-checkerframework-qual")
+    (version "3.49.0")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/typetools/checker-framework.git")
+               (commit (string-append "checker-framework-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "0nxmvljs4wn2pacxy13ilglahzpwr2wvr0v322y7aszxb5k39jqp"))
+        (modules '((guix build utils)))
+        (snippet `(begin
+                    (use-modules (ice-9 ftw)
+                      (ice-9 regex))
+                    (for-each (lambda (f)
+                                (delete-file-recursively f))
+                      (filter (lambda (n)
+                                (not (regexp-match? (string-match
+                                                      "^(\\.+|checker-qual)$" n))))
+                        (scandir ".")))))))
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "checker-qual.jar"
+        #:source-dir "checker-qual/src/main/java"
+        #:tests? #f
+        #:phases (modify-phases %standard-phases
+                   (add-before 'build 'remove-module-info
+                     (lambda _
+                       (delete-file "checker-qual/src/main/java/module-info.java")))
+                   (add-before 'install 'create-pom
+                     (generate-pom.xml "pom.xml" "org.checkerframework" "checker-qual" ,version))
+                   (replace 'install
+                     (install-from-pom "pom.xml")))))
+    (home-page "https://checkerframework.org/")
+    (synopsis "Annotations for pluggable type-checking for Java")
+    (description "The Checker Framework enhances Java's type system to make it more powerful and useful. This lets software developers detect and prevent errors in their Java programs. The Checker Framework includes compiler plug-ins (\"checkers\") that find bugs or verify their absence. It also permits you to write your own compiler plug-ins. This package provides annotations.")
+    (license license:expat)))
+
+(define java-jspecify
   (package
     (name "java-jspecify")
     (version "1.0.0")
@@ -3198,15 +3281,49 @@ available.")
                           "src/java9/java/module-info.java")))
                    (add-before 'build 'remove-gradle-jars
                       (lambda _
-                        (delete-file-recursively "gradle"))))))
+                        (delete-file-recursively "gradle")))
+                   (add-before 'install 'create-pom
+                     (generate-pom.xml "pom.xml" "org.jspecify" "jspecify" ,version))
+                   (replace 'install
+                     (install-from-pom "pom.xml")))))
     (home-page "https://jspecify.dev/")
     (synopsis "Standard Annotations for Java Static Analysis")
     (description "An artifact of well-specified annotations to power static analysis checks and JVM language interop..")
     (license license:asl2.0)))
 
-(define java-auto-service
+; TODO: Implement all Auto packages with maven-build-system
+(define java-auto-common
   (package
-    (name "java-auto-service")
+    (name "java-auto-common")
+    (version "1.2.1")
+    (source
+      (origin
+        (method git-fetch)
+        (uri (git-reference
+               (url "https://github.com/google/auto.git")
+               (commit (string-append "auto-common-" version))))
+        (file-name (git-file-name name version))
+        (sha256 (base32 "1274ywaspp3glhzndkamlf83lwdxj29lyc878f23s2zp0s95znj1"))))
+    (build-system ant-build-system)
+    (inputs (list java-checkerframework-qual))
+    (propagated-inputs
+      (list java-guava java-poet))
+    (arguments
+      `(#:jar-name "common.jar"
+         #:source-dir "common/src/main/java"
+         #:tests? #f ; TODO
+         #:phases (modify-phases %standard-phases
+                    (replace 'install
+                      (install-from-pom "common/pom.xml")))))
+    (home-page "https://github.com/google/auto/")
+    (synopsis "Collection of source code generators for Java, helper utilities")
+    (description "Common utilities for creating Google Auto annotation processors")
+    (license license:asl2.0)))
+
+(define java-auto-service-parent
+  (package
+    (inherit java-auto-common)
+    (name "java-auto-service-parent")
     (version "1.1.1")
     (source
       (origin
@@ -3216,34 +3333,54 @@ available.")
                (commit (string-append "auto-service-" version))))
         (file-name (git-file-name name version))
         (sha256 (base32 "1ds7ik2nqsz6kin7bzj0gy268wv60whs2jiinm5v84ggxpb7igxn"))))
-    (build-system ant-build-system)
+    (inputs '())
+    (propagated-inputs '())
+    (arguments
+      `(#:tests? #f ; No tests in the annotations package
+        #:phases (modify-phases %standard-phases
+                   (delete 'configure)
+                   (delete 'build)
+                   (replace 'install
+                     (install-pom-file "service/pom.xml")))))
+    (home-page "https://github.com/google/auto/tree/main/service")
+    (synopsis "Parent POM for AutoService")))
+
+(define java-auto-service-annotations
+  (package
+    (inherit java-auto-service-parent)
+    (name "java-auto-service-annotations")
+    (inputs '())
+    (propagated-inputs (list java-auto-service-parent))
+    (arguments
+      `(#:jar-name "auto-service-annotations.jar"
+        #:source-dir "service/annotations/src/main/java"
+        #:tests? #f ; No tests in the annotations package
+        #:make-flags (list "-Dant.build.javac.target=1.8")
+         #:phases (modify-phases %standard-phases
+                       (replace 'install
+                         (install-from-pom "service/annotations/pom.xml")))))
+    (home-page "https://github.com/google/auto/tree/main/service")
+    (synopsis "A configuration/metadata generator for java.util.ServiceLoader-style service providers, annotations")
+    (description "AutoService generates this metadata for the developer, for any class annotated with @AutoService, avoiding typos, providing resistance to errors from refactoring, etc. This package provides annotations.")))
+
+(define java-auto-service-processor
+  (package
+    (inherit java-auto-service-parent)
+    (name "java-auto-service-processor")
     (inputs (list java-jspecify))
     (propagated-inputs
-      (list java-guava java-poet))
+      (list java-auto-common java-auto-service-annotations java-guava java-poet))
     (arguments
       `(#:jar-name "auto-service.jar"
-         #:source-dir "prepared"
-         #:make-flags (list "-Dant.build.javac.target=1.8")
-         #:tests? #f ; TODO
-         #:phases ,#~(modify-phases %standard-phases
-                       (add-before 'build 'prepare-resources
-                         (lambda _
-                           (for-each
-                             (lambda (f) (copy-file f "classes"))
-                             (find-files "value/src/main/java" ".*\\.vm$"))))
-                       (add-before 'build 'prepare-sources
-                         (lambda _
-                           (copy-recursively "common/src/main/java" "prepared")
-                           (copy-recursively "service/annotations/src/main/java" "prepared")
-                           (copy-recursively "service/processor/src/main" "prepared")))
-                       (add-after 'prepare-sources 'jspecify-annotations
-                         (lambda _
-                           (substitute* (find-files "prepared" "\\.java$")
-                             (("org.checkerframework.checker.nullness.qual.Nullable") "org.jspecify.annotations.Nullable")))))))
+        #:source-dir "service/processor/src/main/java"
+        #:make-flags (list "-Dant.build.javac.target=1.8")
+        #:tests? #f ; TODO
+        #:phases ,#~(modify-phases %standard-phases
+                       (replace 'install
+                         (install-from-pom "service/processor/pom.xml")))))
     (home-page "https://github.com/google/auto/tree/main/service")
     (synopsis "A configuration/metadata generator for java.util.ServiceLoader-style service providers")
-    (description "AutoService generates this metadata for the developer, for any class annotated with @AutoService, avoiding typos, providing resistance to errors from refactoring, etc.")
-    (license license:asl2.0)))
+    (description "AutoService generates this metadata for the developer, for any class annotated with @AutoService, avoiding typos, providing resistance to errors from refactoring, etc.")))
 
 (define java-gradle-incap
   (package
@@ -3258,19 +3395,23 @@ available.")
         (file-name (git-file-name name version))
         (sha256 (base32 "17kbbl2w1glddvdvz6bk113figms4qj5pvh00kcrcbw66wnj40s6"))))
     (build-system ant-build-system)
-    (native-inputs (list java-auto-service))
+    (native-inputs (list java-auto-service-processor))
     (arguments
-      `(#:jar-name "gradle-incap.jar"
+      `(#:jar-name "incap.jar"
         #:source-dir "prepared"
         #:tests? #f ; TODO
-        #:phases ,#~(modify-phases %standard-phases
+        #:phases (modify-phases %standard-phases
                       (add-before 'build 'prepare-resources
                         (lambda _
                           (copy-recursively "processor/src/main/resources" "classes")))
                       (add-before 'build 'prepare-sources
                         (lambda _
                           (copy-recursively "lib/src/main/java" "prepared")
-                          (copy-recursively "processor/src/main/java" "prepared"))))))
+                          (copy-recursively "processor/src/main/java" "prepared")))
+                      (add-before 'install 'create-pom
+                        (generate-pom.xml "pom.xml" "net.ltgt.gradle.incap" "incap" ,version))
+                      (replace 'install
+                        (install-from-pom "pom.xml")))))
     (home-page "https://github.com/tbroyer/gradle-incap-helper")
     (synopsis "Helper library and annotation processor for building incremental annotation processors")
     (description "This library and annotation processor helps you generate the META-INF descriptor, and return the appropriate value from your processor's getSupportedOptions() if it's dynamic.")
@@ -3289,16 +3430,31 @@ available.")
         (file-name (git-file-name name version))
         (sha256 (base32 "1svgwhnnd6cq18xs699a2z6n4hxczbi25jc8srpszc7582cwv829"))))
     (build-system ant-build-system)
-    (native-inputs (list java-auto-service))
+    (native-inputs (list java-auto-service-processor))
     (arguments
       `(#:jar-name "escape-velocity.jar"
         #:source-dir "src/main"
-        #:tests? #f)) ; TODO: add tests when Guix has Apache Velocity packaged
+        #:tests? #f ; Tests depend on Apache Velocity which is a huge complex project
+        #:phases (modify-phases %standard-phases
+                   (replace 'install
+                     (install-from-pom "pom.xml")))))
     (home-page "https://github.com/google/escapevelocity")
     (synopsis "A subset reimplementation of Apache Velocity with a much simpler API")
     (description "EscapeVelocity is a templating engine that can be used from Java. It is a reimplementation of a subset of functionality from Apache Velocity. EscapeVelocity has no facilities for HTML escaping and it is not appropriate for producing HTML output that might include portions of untrusted input.")
     (license license:asl2.0)))
 
+(define java-asm-9-mavenized
+  (package
+    (inherit java-asm-9)
+    (name "java-asm-9-mavenized")
+    (arguments
+      `(#:phases
+         (modify-phases %standard-phases
+           (add-before 'install 'create-pom
+               (generate-pom.xml "pom.xml" "org.ow2.asm" "asm" ,(package-version java-asm-9)))
+           (replace 'install
+               (install-from-pom "pom.xml")))
+        ,@(package-arguments java-asm-9)))))
 (define java-truth
   (package
     (name "java-truth")
@@ -3310,16 +3466,36 @@ available.")
                (url "https://github.com/google/truth.git")
                (commit (string-append "v" version))))
         (file-name (git-file-name name version))
-        (sha256 (base32 "13fmzmsmkjdxxrmm0xvlzj5kmvwdgalx4hnqc7wqjkhhxdgxdvch"))))
-    (inputs (list java-jspecify))
+        (sha256 (base32 "13fmzmsmkjdxxrmm0xvlzj5kmvwdgalx4hnqc7wqjkhhxdgxdvch"))
+        (patches '("patches/truth.patch"))))
+    (inputs (list java-auto-value java-error-prone-annotations java-guava-testlib java-jspecify java-protobuf-api))
     (propagated-inputs (list java-guava))
     (build-system maven-build-system)
+    (arguments
+      `(#:exclude (("kr.motd.maven" . ("os-maven-plugin"))
+                   ("org.codehaus.mojo" . ("build-helper-maven-plugin"))
+                   ("org.xolstice.maven.plugins" . ("protobuf-maven-plugin"))
+                   ("org.apache.maven.plugins" . ("maven-antrun-plugin" "maven-javadoc-plugin")))
+        #:phases ,#~(modify-phases %standard-phases
+                      (add-after 'unpack 'remove-modules ;; Delete extensions for not packaged artifacts
+                        (lambda _
+                          (delete-file-recursively "extensions/re2j")))
+                      (add-after 'unpack 'patch-poms
+                               (lambda _
+                                 (substitute* (find-files "." "pom\\.xml$")
+                                   (("<artifactId>protobuf-lite</artifactId>") "<artifactId>protobuf-java</artifactId>")
+                                   (("><") "> <")))) ; Workaround maven-build-system failures on multiple nodes in a single line
+                      (add-before 'build 'patch-annotations
+                        (lambda _
+                          (substitute* (find-files "." "\\.java$")
+                            (("import com.google.j2objc.annotations.J2ObjCIncompatible;") "")
+                            (("@J2ObjCIncompatible(\\([^)]+\\))?") "")))))))
     (home-page "https://truth.dev/")
     (synopsis "Fluent assertions for Java and Android")
     (description "Truth makes your test assertions and failure messages more readable. Similar to AssertJ, it natively supports many JDK and Guava types, and it is extensible to others.")
     (license license:asl2.0)))
 
-(define java-poet
+(define java-poet ; TODO: break cyclic dependency on Truth
   (package
     (name "java-poet")
     (version "1.13.0")
@@ -3331,12 +3507,79 @@ available.")
                (commit (string-append "javapoet-" version))))
         (file-name (git-file-name name version))
         (sha256 (base32 "1q4faw7mpzgjw8lfs39qs36n8i2a5drg3r89wn0xb2s569jvqg9y"))))
-    (inputs java-truth)
-    (build-system maven-build-system)
+    (build-system ant-build-system)
+    (arguments
+      `(#:jar-name "javapoet.jar"
+        #:source-dir "src/main/java"
+        #:tests? #f ;tests depend on Google Truch, which depends on this package
+        #:phases (modify-phases %standard-phases
+                   (replace 'install
+                     (install-from-pom "pom.xml")))))
     (home-page "https://github.com/square/javapoet")
     (synopsis "A Java API for generating .java source files")
     (description "Source file generation can be useful when doing things such as annotation processing or interacting with metadata files (e.g., database schemas, protocol formats). By generating code, you eliminate the need to write boilerplate while also keeping a single source of truth for the metadata.")
     (license license:asl2.0)))
+
+(define plexus-parent-pom-15
+  (package
+    (inherit plexus-parent-pom-8)
+    (version "15")
+    (source (origin
+      (inherit (package-source plexus-parent-pom-8))
+      (uri (git-reference
+             (url "https://github.com/codehaus-plexus/plexus-pom")
+             (commit (string-append "plexus-" version))))
+      (file-name (git-file-name (package-name plexus-parent-pom-8) version))
+      (sha256 (base32 "0rjbfy7qpvxa75ak3cx6vgd0agpbgdkc95jsbk3qhm9n0nisylh1"))))
+    (propagated-inputs '())))
+
+(define java-plexus-java-1
+  (package
+    (inherit java-plexus-java)
+    (version "1.2.0")
+    (source (origin
+              (inherit (package-source java-plexus-java))
+              (uri (git-reference
+                     (url "https://github.com/codehaus-plexus/plexus-languages")
+                     (commit (string-append "plexus-languages-" version))))
+              (file-name (git-file-name "java-plexus-java" version))
+              (sha256
+                (base32 "0myfp1bwncw3jg7cknn44qy55hwdp1917cgraiajqwmghif18gxs"))))
+    (propagated-inputs (modify-inputs (package-propagated-inputs java-plexus-java)
+                                        (replace "java-asm" java-asm-9-mavenized)
+                                        (replace "plexus-parent-pom" plexus-parent-pom-15)))))
+
+(define maven-artifact-transfer-fixed
+  (package
+    (inherit maven-artifact-transfer)
+    (propagated-inputs
+      (modify-inputs (package-propagated-inputs maven-artifact-transfer)
+        (append maven-parent-pom-34)))
+    (arguments
+      (substitute-keyword-arguments (package-arguments maven-artifact-transfer)
+        ((#:phases phases)
+          `(modify-phases ,phases
+             (add-before 'install 'fix-parent
+               (lambda _
+                 (substitute* "pom.xml"
+                   (("<relativePath>.+</relativePath>") ""))))))))))
+(define maven-core-fixed
+  (package
+    (inherit maven-core)
+    (arguments
+      (substitute-keyword-arguments (package-arguments maven-core)
+        ((#:phases phases)
+          `(modify-phases ,phases
+             (add-after 'fix-plugin-versions 'fix-issue-73300
+               (lambda _
+                 (substitute* '("build/classes/META-INF/plexus/default-bindings.xml"
+                                 "build/classes/META-INF/plexus/components.xml")
+                   (("maven-surefire-plugin:[^:<]+")
+                     (string-append "maven-surefire-plugin:"
+                       ,(package-version maven-surefire-plugin))))))))))))
+(define fix-maven-system-bugs (package-input-rewriting
+                               `((,maven-artifact-transfer . ,maven-artifact-transfer-fixed)
+                                 (,maven-core . ,maven-core-fixed))))
 
 (define java-auto-value
   (package
@@ -3349,39 +3592,46 @@ available.")
                (url "https://github.com/google/auto.git")
                (commit (string-append "auto-value-" version))))
         (file-name (git-file-name name version))
-        (sha256 (base32 "14p23vwv1bc8qrk5yrgx0x567dj4if81qq6hcfy4bnxm3k85prcj"))))
-    (build-system ant-build-system)
-    (inputs (list java-auto-service java-error-prone-annotations java-jspecify))
+        (sha256 (base32 "14p23vwv1bc8qrk5yrgx0x567dj4if81qq6hcfy4bnxm3k85prcj"))
+        (patches '("patches/java-auto-value-remove-test-deps.patch"))))
+    (build-system maven-build-system)
+    (inputs (list java-auto-service-processor java-error-prone-annotations java-jspecify java-plexus-java-1))
     (propagated-inputs
-      (list java-asm-9 java-escapevelocity java-guava java-gradle-incap java-poet))
+      (list java-asm-9-mavenized java-auto-common java-auto-service-annotations java-escapevelocity java-guava java-gradle-incap java-poet))
     (arguments
-      `(#:jar-name "auto-value.jar"
-        #:source-dir "prepared"
-        #:phases ,#~(modify-phases %standard-phases
-                      (add-before 'build 'prepare-resources
-                        (lambda _
-                          (mkdir-p "classes")
-                          (for-each
-                            (lambda (f) (copy-file f (string-append "classes/" (basename f))))
-                            (find-files "value/src/main/java" ".*\\.vm$"))))
-                      (add-before 'build 'prepare-sources
-                        (lambda _
-                          (copy-recursively "common/src/main/java" "prepared/common")
-                          (for-each
-                            (lambda (d)
-                              (copy-recursively
-                                (string-append "value/src/main/java/com/google/auto/value/" d)
-                                (string-append "prepared/" d)))
-                            (list
-                              "processor"
-                              "extension/memoized/processor"
-                              "extension/serializable/processor"
-                              "extension/serializable/serializer"
-                              "extension/toprettystring/processor"))))
-                      (add-after 'prepare-sources 'jspecify-annotations
-                        (lambda _
-                          (substitute* (find-files "prepared" "\\.java$")
-                            (("org.checkerframework.checker.nullness.qual.Nullable") "org.jspecify.annotations.Nullable")))))))
+      `(#:exclude (("org.apache.maven.plugins" . ("maven-invoker-plugin" "maven-shade-plugin"))
+                   ("com.google.auto.value" . ("auto-value-annotations"))
+                   ("com.google.errorprone" . ("error_prone_type_annotations"))
+                   ("org.junit". ("junit-bom")))
+         #:maven ,(fix-maven-system-bugs maven)
+         #:maven-plugins (("maven-compiler-plugin" ,(fix-maven-system-bugs maven-compiler-plugin))
+                          ("maven-jar-plugin" ,(fix-maven-system-bugs maven-jar-plugin))
+                          ("maven-install-plugin" ,(fix-maven-system-bugs maven-install-plugin))
+                          ("maven-resources-plugin" ,(fix-maven-system-bugs maven-resources-plugin))
+                          ("maven-surefire-plugin" ,(fix-maven-system-bugs maven-surefire-plugin)))
+         #:tests? #f ; TODO
+         #:phases (modify-phases %standard-phases
+                   (add-after 'unpack 'move-package-directory ; Workaround #:pom-file not working
+                     (lambda _
+                       ;; Delete everything except this specific module (and ignore current/parent directory links)
+                       (use-modules (ice-9 ftw) (ice-9 regex))
+                       (for-each (lambda (f)
+                                   (delete-file-recursively f))
+                         (filter (lambda (n)
+                                   (not (regexp-match? (string-match
+                                                         "^(\\.+|value)$" n))))
+                           (scandir ".")))
+                       (copy-recursively "value" ".")
+                       (delete-file-recursively "value")))
+                   (add-after 'move-package-directory 'remove-tests
+                     (lambda _
+                       (delete-file-recursively "src/it")
+                       (delete-file-recursively "src/test")))
+                   (add-after 'move-package-directory 'patch-dependencies
+                     (lambda _ ;; Workaround '#:exclude' not working for this dependencies
+                       (substitute* (find-files "." "pom\\.xml$")
+                         (("<artifactId>incap-processor</artifactId>") "<artifactId>incap</artifactId>")))) ; TODO: remove this replacement
+                   )))
     (home-page "https://github.com/google/auto/tree/main/value")
     (synopsis "Generate immutable value classes for Java 8+")
     (description "AutoValue provides an easier way to create immutable value classes, with a lot less code and less room for error, while not restricting your freedom to code almost any aspect of your class exactly the way you want it.")
@@ -3401,7 +3651,7 @@ available.")
         (sha256 (base32 "0pdwggiwymk2in1kk8kxwa92422naqrfarb5zvwmjmqd21587zqf"))))
     (native-inputs (list java-error-prone-annotations java-jspecify node protobuf))
     (propagated-inputs
-      (list java-args4j java-gson java-guava java-protobuf-api))
+      (list java-args4j java-auto-value java-gson java-guava java-protobuf-api))
     (build-system ant-build-system)
     (arguments
       `(#:jar-name "closure-compiler-unshaded.jar"
@@ -3414,6 +3664,7 @@ available.")
             (lambda _
               (delete-file-recursively "src/com/google/debugging/sourcemap/super")
               (delete-file-recursively "src/com/google/javascript/jscomp/j2clbuild/super")
+              (delete-file-recursively "src/com/google/javascript/jscomp/resources/super")
               (delete-file-recursively "src/com/google/javascript/rhino/testing/super-j2cl")))
           (add-before 'build 'generate-sources
             (lambda* (#:key inputs #:allow-other-keys)
