@@ -39,6 +39,132 @@
              description="Builds redistributables from sources"/>
 
      <target name="dist-quick"
+@@ -1459,4 +1459,135 @@
+     <target name="build-bootstrap-artifacts" depends="dist,zip-compiler"/>
+
+     <target name="build-artifacts" depends="dist,zip-compiler,zip-test-data"/>
++    <target name="prepare-mocksdk">
++        <property environment="env"/>
++        <cleandir dir="generator-classes"/>
++        <path id="generator-classpath">
++            <pathelement path="${idea.sdk}/core/guava-20.0.jar"/>
++            <pathelement path="${idea.sdk}/core/intellij-core.jar"/>
++            <pathelement path="${idea.sdk}/core/jetbrains-trove4j.jar"/>
++        </path>
++
++        <jar destfile="compiler/testData/mockJDK/jre/lib/annotations.jar">
++            <!-- Workaround unit tests expecting an external annotation jar for JDK even though this version of Kotlin has no use for it -->
++        </jar>
++
++        <javac2 srcdir="generators/src/org/jetbrains/kotlin/generators/mockJDK" destdir="generator-classes" debug="true" debuglevel="lines,vars,source"
++                includeAntRuntime="false">
++            <classpath>
++                <path refid="generator-classpath"/>
++            </classpath>
++        </javac2>
++
++        <java classname="org.jetbrains.kotlin.generators.mockJDK.GenerateMockJdk" failonerror="true" fork="true" maxmemory="${max.heap.size.for.forked.jvm}">
++            <classpath>
++                <path refid="generator-classpath"/>
++                <pathelement location="generator-classes"/>
++            </classpath>
++            <assertions>
++                <enable/>
++            </assertions>
++            <sysproperty key="rt.jar" value="${env.JAVA_HOME}/jre/lib/rt.jar"/>
++            <sysproperty key="src.zip" value="${env.JAVA_HOME}/src.zip"/>
++        </java>
++    </target>
++    <target name="compile-tests">
++        <cleandir dir="test-classes"/>
++        <dirset dir="${basedir}" id="tests-src.dirset">
++            <include name="compiler/ir/ir.ir2cfg/src"/>
++            <include name="compiler/tests-common"/>
++            <include name="compiler/tests"/>
++        </dirset>
++        <path id="compile-tests-classpath">
++            <pathelement path="${output}/classes/compiler"/>
++            <pathelement path="${output}/classes/core"/>
++            <pathelement path="${output}/classes/daemon-client"/>
++            <pathelement location="${protobuf.jar}"/>
++            <pathelement path="${idea.sdk}/core/asm-6.0.jar"/>
++            <pathelement path="${idea.sdk}/core/guava-20.0.jar"/>
++            <pathelement path="${idea.sdk}/core/jetbrains-trove4j.jar"/>
++            <pathelement path="${idea.sdk}/core/picocontainer.jar"/>
++            <pathelement path="${idea.sdk}/core/intellij-annotations.jar"/>
++            <pathelement path="${idea.sdk}/core/intellij-platform-api.jar"/>
++            <pathelement path="${idea.sdk}/core/intellij-core.jar"/>
++            <pathelement location="libraries/lib/junit-4.11.jar"/>
++            <pathelement location="${kotlin-home}/lib/kotlin-preloader.jar"/>
++            <pathelement location="${kotlin-home}/lib/kotlin-reflect.jar"/>
++            <pathelement location="${kotlin-home}/lib/kotlin-script-runtime.jar"/>
++            <pathelement location="${kotlin-home}/lib/kotlin-test.jar"/>
++        </path>
++        
++        <!-- Source paths separated by space (to pass to "arg line" below) -->
++        <local name="tests-src.line"/>
++        <pathconvert property="tests-src.line" refid="tests-src.dirset" pathsep=" "/>
++        
++        <java classname="org.jetbrains.kotlin.preloading.Preloader" failonerror="true" fork="true" maxmemory="${max.heap.size.for.forked.jvm}">
++            <classpath>
++                <pathelement location="${kotlin-home}/lib/kotlin-preloader.jar"/>
++            </classpath>
++            <assertions>
++                <enable/>
++            </assertions>
++            <arg value="-cp"/>
++            <arg value="${kotlin-home}/lib/kotlin-compiler.jar"/>
++            <arg value="org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"/>
++            <arg line="${tests-src.line}"/>
++            <arg value="compiler/tests-java8"/>
++            <arg value="-d"/>
++            <arg value="test-classes"/>
++            <arg value="-version"/>
++            <arg value="-classpath"/>
++            <arg value="${toString:compile-tests-classpath}"/>
++        </java>
++        
++        <javac2 srcdir="${toString:tests-src.dirset}" destdir="test-classes" debug="true" debuglevel="lines,vars,source"
++                includeAntRuntime="false">
++            <classpath>
++                <path refid="compile-tests-classpath"/>
++                <pathelement location="${kotlin-home}/lib/kotlin-stdlib.jar"/>
++                <pathelement location="test-classes"/>
++            </classpath>
++        </javac2>
++        <javac2 srcdir="compiler/tests-java8" destdir="test-classes" debug="true" debuglevel="lines,vars,source"
++                includeAntRuntime="false">
++            <classpath>
++                <path refid="compile-tests-classpath"/>
++                <pathelement location="${kotlin-home}/lib/kotlin-stdlib.jar"/>
++                <pathelement location="test-classes"/>
++            </classpath>
++        </javac2>
++    </target>
++    <target name="check" depends="prepare-mocksdk,compile-tests">
++        <cleandir dir="test-reports"/>
++        <junit printsummary="true" showoutput="true" fork="yes" threads="4" haltonfailure="yes">
++            <classpath>
++                <pathelement location="${kotlin-home}/lib/kotlin-compiler.jar"/>
++                <pathelement location="${kotlin-home}/lib/kotlin-stdlib.jar"/>
++                <path refid="compile-tests-classpath"/>
++                <pathelement path="test-classes"/>
++            </classpath>
++            <formatter type="plain" usefile="true"/>
++            <batchtest fork="yes" skipNonTests="yes" todir="test-reports">
++                <fileset dir="test-classes">
++                    <include name="**/*.class"/>
++
++                    <!-- Workaround skipNonTests not excluding outer classes: -->
++                    <exclude name="org/jetbrains/kotlin/asJava/KotlinLightClassStructureTest.class"/>
++                    <exclude name="org/jetbrains/kotlin/cfg/PseudoValueTestGenerated.class"/>
++                    <!-- No scripts to generate mockJDKModified used in the test: -->
++                    <exclude name="org/jetbrains/kotlin/cfg/DiagnosticsWithModifiedMockJdkTestGenerated.class"/>
++                </fileset>
++            </batchtest>
++        </junit>
++    </target>
+ </project>
 --- a/compiler/cli/src/org/jetbrains/kotlin/cli/common/messages/PlainTextMessageRenderer.java
 +++ b/compiler/cli/src/org/jetbrains/kotlin/cli/common/messages/PlainTextMessageRenderer.java
 @@ -20,6 +20,5 @@
@@ -71,3 +197,201 @@
 +    public static final boolean COLOR_ENABLED = true;
 
      private static final String LINE_SEPARATOR = LineSeparator.getSystemLineSeparator().getSeparatorString();
+--- a/compiler/tests-common/org/jetbrains/kotlin/test/KotlinTestUtils.java
++++ b/compiler/tests-common/org/jetbrains/kotlin/test/KotlinTestUtils.java
+@@ -21,8 +21,6 @@
+ import com.google.common.collect.Maps;
+ import com.google.common.collect.Sets;
+ import com.intellij.openapi.Disposable;
+-import com.intellij.openapi.editor.Document;
+-import com.intellij.openapi.editor.Editor;
+ import com.intellij.openapi.project.Project;
+ import com.intellij.openapi.util.Comparing;
+ import com.intellij.openapi.util.ShutDownTracker;
+@@ -332,7 +332,7 @@
+     @NotNull
+     public static String getHomeDirectory() {
+         File resourceRoot = PathUtil.getResourcePathForClass(KotlinTestUtils.class);
+-        return FileUtil.toSystemIndependentName(resourceRoot.getParentFile().getParentFile().getParent());
++        return FileUtil.toSystemIndependentName(resourceRoot.getParent());
+     }
+ 
+     public static File findMockJdkRtJar() {
+@@ -517,12 +515,6 @@
+         JvmResolveUtil.analyze(ktFiles, environment);
+     }
+ 
+-    public static void assertEqualsToFile(@NotNull File expectedFile, @NotNull Editor editor) {
+-        String actualText = editor.getDocument().getText();
+-        String afterText = new StringBuilder(actualText).insert(editor.getCaretModel().getOffset(), "<caret>").toString();
+-
+-        assertEqualsToFile(expectedFile, afterText);
+-    }
+ 
+     public static void assertEqualsToFile(@NotNull File expectedFile, @NotNull String actual) {
+         assertEqualsToFile(expectedFile, actual, new Function1<String, String>() {
+@@ -732,30 +724,35 @@
+         return files;
+     }
+ 
+-    public static String getLastCommentedLines(@NotNull Document document) {
++    public static String getLastCommentedLines(@NotNull String document) {
++        List<String> lines = new ArrayList<String>();
++        try (java.util.Scanner scanner = new java.util.Scanner(document).useDelimiter("\\r\\n|\\r|\\n")) {
++            while (scanner.hasNext()) {
++                lines.add(scanner.next());
++            }
++        }
++        Collections.reverse(lines);
+         List<CharSequence> resultLines = new ArrayList<CharSequence>();
+-        for (int i = document.getLineCount() - 1; i >= 0; i--) {
+-            int lineStart = document.getLineStartOffset(i);
+-            int lineEnd = document.getLineEndOffset(i);
+-            if (document.getCharsSequence().subSequence(lineStart, lineEnd).toString().trim().isEmpty()) {
++        for (String line : lines) {
++            if (line.trim().isEmpty()) {
+                 continue;
+             }
+ 
+-            if ("//".equals(document.getCharsSequence().subSequence(lineStart, lineStart + 2).toString())) {
+-                resultLines.add(document.getCharsSequence().subSequence(lineStart + 2, lineEnd));
++            if (line.startsWith("//")) {
++                resultLines.add(line.substring(2));
+             }
+             else {
+                 break;
+             }
+         }
+         Collections.reverse(resultLines);
+         StringBuilder result = new StringBuilder();
+         for (CharSequence line : resultLines) {
+             result.append(line).append("\n");
+         }
+         result.delete(result.length() - 1, result.length());
+         return result.toString();
+     }
+ 
+     public enum CommentType {
+         ALL,
+--- a/compiler/tests-common/org/jetbrains/kotlin/test/testFramework/KtParsingTestCase.java
++++ b/compiler/tests-common/org/jetbrains/kotlin/test/testFramework/KtParsingTestCase.java
+@@ -22,8 +22,6 @@
+ import com.intellij.mock.MockFileDocumentManagerImpl;
+ import com.intellij.openapi.Disposable;
+ import com.intellij.openapi.application.PathManager;
+-import com.intellij.openapi.editor.Document;
+-import com.intellij.openapi.editor.EditorFactory;
+ import com.intellij.openapi.extensions.ExtensionPointName;
+ import com.intellij.openapi.extensions.Extensions;
+ import com.intellij.openapi.fileEditor.FileDocumentManager;
+@@ -67,7 +67,6 @@
+ 
+ @SuppressWarnings("ALL")
+ public abstract class KtParsingTestCase extends KtPlatformLiteFixture {
+-    public static final Key<Document> HARD_REF_TO_DOCUMENT_KEY = Key.create("HARD_REF_TO_DOCUMENT_KEY");
+     protected String myFilePrefix = "";
+     protected String myFileExt;
+     protected final String myFullDataPath;
+@@ -101,14 +100,6 @@
+         myFileFactory = new PsiFileFactoryImpl(myPsiManager);
+         MutablePicoContainer appContainer = getApplication().getPicoContainer();
+         registerComponentInstance(appContainer, MessageBus.class, MessageBusFactory.newMessageBus(getApplication()));
+-        final MockEditorFactory editorFactory = new MockEditorFactory();
+-        registerComponentInstance(appContainer, EditorFactory.class, editorFactory);
+-        registerComponentInstance(appContainer, FileDocumentManager.class, new MockFileDocumentManagerImpl(new Function<CharSequence, Document>() {
+-            @Override
+-            public Document fun(CharSequence charSequence) {
+-                return editorFactory.createDocument(charSequence);
+-            }
+-        }, HARD_REF_TO_DOCUMENT_KEY));
+         registerComponentInstance(appContainer, PsiDocumentManager.class, new MockPsiDocumentManager());
+         registerApplicationService(PsiBuilderFactory.class, new PsiBuilderFactoryImpl());
+         registerApplicationService(DefaultASTFactory.class, new CoreASTFactory());
+--- a/compiler/tests-common/org/jetbrains/kotlin/renderer/AbstractDescriptorRendererTest.kt
++++ b/compiler/tests-common/org/jetbrains/kotlin/renderer/AbstractDescriptorRendererTest.kt
+@@ -16,7 +16,6 @@
+
+ package org.jetbrains.kotlin.renderer
+
+-import com.intellij.openapi.editor.impl.DocumentImpl
+ import com.intellij.openapi.util.io.FileUtil
+ import org.jetbrains.kotlin.cli.jvm.compiler.CliLightClassGenerationSupport
+ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+@@ -149,6 +149,6 @@
+         }
+         val renderedDescriptors = descriptors.map { renderer.render(it) }.joinToString(separator = "\n")
+
+-        val document = DocumentImpl(psiFile.text)
++        val document = psiFile.text
+         KtUsefulTestCase.assertSameLines(KotlinTestUtils.getLastCommentedLines(document), renderedDescriptors)
+     }
+--- a/compiler/tests/org/jetbrains/kotlin/renderer/AbstractFunctionDescriptorInExpressionRendererTest.kt
++++ b/compiler/tests/org/jetbrains/kotlin/renderer/AbstractFunctionDescriptorInExpressionRendererTest.kt
+@@ -16,7 +16,6 @@
+ 
+ package org.jetbrains.kotlin.renderer
+ 
+-import com.intellij.openapi.editor.impl.DocumentImpl
+ import com.intellij.openapi.util.io.FileUtil
+ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+@@ -61,6 +61,6 @@
+         }
+         val renderedDescriptors = descriptors.map { renderer.render(it) }.joinToString(separator = "\n")
+
+-        val document = DocumentImpl(file.text)
++        val document = file.text
+         KtUsefulTestCase.assertSameLines(KotlinTestUtils.getLastCommentedLines(document), renderedDescriptors.toString())
+     }
+--- a/compiler/tests-common/org/jetbrains/kotlin/codegen/CodegenTestCase.java
++++ b/compiler/tests-common/org/jetbrains/kotlin/codegen/CodegenTestCase.java
+@@ -396,9 +396,6 @@
+             try {
+                 classFileFactory = generateFiles(myEnvironment, myFiles);
+ 
+-                if (DxChecker.RUN_DX_CHECKER) {
+-                    DxChecker.check(classFileFactory);
+-                }
+             }
+             catch (Throwable e) {
+                 e.printStackTrace();
+--- a/compiler/tests-common/org/jetbrains/kotlin/test/testFramework/KtPlatformTestUtil.java
++++ b/compiler/tests-common/org/jetbrains/kotlin/test/testFramework/KtPlatformTestUtil.java
+@@ -16,7 +16,6 @@
+ 
+ package org.jetbrains.kotlin.test.testFramework;
+ 
+-import com.intellij.ide.util.treeView.AbstractTreeNode;
+ import com.intellij.openapi.ui.Queryable;
+ import com.intellij.openapi.util.text.StringUtil;
+ import org.jetbrains.annotations.NotNull;
+@@ -53,16 +52,6 @@
+ 
+     @Nullable
+     protected static String toString(@Nullable Object node, @Nullable Queryable.PrintInfo printInfo) {
+-        if (node instanceof AbstractTreeNode) {
+-            if (printInfo != null) {
+-                return ((AbstractTreeNode) node).toTestString(printInfo);
+-            }
+-            else {
+-                @SuppressWarnings({"deprecation", "UnnecessaryLocalVariable"}) String presentation =
+-                        ((AbstractTreeNode) node).getTestPresentation();
+-                return presentation;
+-            }
+-        }
+         if (node == null) {
+             return "NULL";
+         }
+--- a/compiler/tests-common/org/jetbrains/kotlin/test/testFramework/mock/MockPsiManager.java
++++ b/compiler/tests-common/org/jetbrains/kotlin/test/testFramework/mock/MockPsiManager.java
+@@ -128,6 +128,10 @@
+   public void dropResolveCaches() {
+     getFileManager().cleanupForNextTest();
+   }
++  @Override
++  public void dropPsiCaches() {
++    dropResolveCaches();
++  }
+ 
+   @Override
+   public boolean isInProject(@NotNull PsiElement element) {

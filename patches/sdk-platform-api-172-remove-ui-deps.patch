@@ -1,0 +1,51 @@
+--- a/platform/platform-api/src/com/intellij/openapi/fileTypes/UserFileType.java
++++ b/platform/platform-api/src/com/intellij/openapi/fileTypes/UserFileType.java
+@@ -15,7 +15,6 @@
+  */
+ package com.intellij.openapi.fileTypes;
+ 
+-import com.intellij.openapi.options.SettingsEditor;
+ import com.intellij.openapi.vfs.VirtualFile;
+ import com.intellij.util.PlatformIcons;
+ import org.jetbrains.annotations.NotNull;
+@@ -27,7 +26,7 @@
+   private String myDescription = "";
+   private Icon myIcon = PlatformIcons.CUSTOM_FILE_ICON;
+ 
+-  public abstract SettingsEditor<T> getEditor();
++  public final Object getEditor() {return null;};
+ 
+   @Override
+   public UserFileType clone() {
+--- a/platform/platform-api/src/com/intellij/openapi/fileTypes/UserBinaryFileType.java
++++ b/platform/platform-api/src/com/intellij/openapi/fileTypes/UserBinaryFileType.java
+@@ -15,12 +15,7 @@
+  */
+ package com.intellij.openapi.fileTypes;
+ 
+-import com.intellij.openapi.options.SettingsEditor;
+-
+ public class UserBinaryFileType extends UserFileType<UserBinaryFileType> {
+-  public SettingsEditor<UserBinaryFileType> getEditor() {
+-    return null;
+-  }
+ 
+   public boolean isBinary() {
+     return true;
+--- a/platform/platform-api/src/com/intellij/openapi/vfs/local/FileWatcherNotificationSink.java
++++ b/platform/platform-api/src/com/intellij/openapi/vfs/local/FileWatcherNotificationSink.java
+@@ -15,7 +15,6 @@
+  */
+ package com.intellij.openapi.vfs.local;
+ 
+-import com.intellij.notification.NotificationListener;
+ import com.intellij.openapi.util.Pair;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+@@ -40,5 +39,4 @@
+ 
+   void notifyReset(@Nullable String path);
+ 
+-  void notifyUserOnFailure(@NotNull String cause, @Nullable NotificationListener listener);
+ }
+\ No newline at end of file

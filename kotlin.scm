@@ -1527,6 +1527,74 @@ available.")
     (description "IntelliJ Platform, util submodule")
     (license license:asl2.0)))
 
+(define intellij-platform-api-kotlin-172 ; TODO: merge this into intellij-core-kotlin-172
+  (package
+    (name "intellij-platform-api-kotlin")
+    (version "172")
+    (source
+      (origin
+        (method url-fetch)
+        (uri (string-append
+               "https://github.com/JetBrains/intellij-community/archive/refs/heads/"
+               version ".tar.gz"))
+        (file-name (string-append "intellij-community-" version ".tar.gz"))
+        (sha256
+          (base32 "08r1q6wrx6h1w6aw9m9pr6sky2r3bmn25chaxs7jp7ryw8r3205n"))
+        (modules '((guix build utils)))
+        (patches '("patches/sdk-platform-api-172-remove-pathmacros.patch"
+                   "patches/sdk-platform-api-172-remove-ui-deps.patch"))
+        (snippet '(begin
+                    (mkdir-p "module")
+                    (for-each
+                      (lambda (f) (copy-recursively f "module"))
+                      (list
+                        "platform/platform-api/src/com/intellij/execution"
+                        "platform/platform-api/src/com/intellij/openapi/fileTypes"
+                        "platform/platform-api/src/com/intellij/openapi/vfs"))
+                    (for-each
+                      (lambda (f)
+                        (rename-file f (string-append "module/" (basename f))))
+                      (list "java/java-runtime/src/com/intellij/rt/execution/junit/FileComparisonFailure.java"))
+
+                    ;; Keep only the module source and a required file from bin
+                    (use-modules (ice-9 ftw)
+                      (ice-9 regex))
+                    (for-each (lambda (f)
+                                (delete-file-recursively f))
+                      (filter (lambda (n)
+                                (not (regexp-match? (string-match
+                                                      "^(\\.+|module)$"
+                                                      n))))
+                        (scandir ".")))
+                    (for-each delete-file
+                      (find-files "module"
+                        ".*\\.(a|class|exe|jar|so|zip)$"))))))
+    (build-system ant-build-system)
+    (native-inputs (list intellij-annotations-172))
+    (propagated-inputs (list java-junit intellij-core-kotlin-172))
+    (arguments
+      `(#:jar-name "intellij-platform-api.jar"
+         #:source-dir "module"
+         #:tests? #f ; this module has no tests
+         #:phases (modify-phases %standard-phases
+                    (add-before 'build 'remove-some-sources
+                      (lambda _
+                        (for-each delete-file
+                          (list
+                            "module/configurations/PtyCommandLine.java"
+                            "module/filters/BrowserHyperlinkInfo.java"
+                            "module/process/AnsiEscapeDecoder.java"
+                            "module/process/CapturingAnsiEscapesAwareProcessHandler.java"
+                            "module/process/ColoredOutputTypeRegistry.java"
+                            "module/process/ConsoleHighlighter.java"
+                            "module/process/ProcessTerminatedListener.java"
+                            "module/util/ExecutionErrorDialog.java"))
+                        (delete-file-recursively "module/ui"))))))
+    (home-page "https://www.jetbrains.com/opensource/idea/")
+    (synopsis "IntelliJ Platform: patched parts of Platform API for building Kotlin")
+    (description "IntelliJ Platform, patched parts of platform API submodule for building Kotlin")
+    (license license:asl2.0)))
+
 (define intellij-jps-model-api-139
   (package
     (name "intellij-jps-model-api")
@@ -4083,6 +4151,7 @@ available.")
                       #$version)
                     (string-append "-Dbootstrap.compiler.home="
                       #$inherited-package)))
+              ((#:tests? _) #t)
               ((#:phases inherited-phases)
                    `(modify-phases ,inherited-phases
                       (add-before 'build 'set-release-mode
@@ -4120,6 +4189,14 @@ available.")
                                           ,(package-version java-junit)
                                           ".jar")
                             "ideaSDK/lib/junit-4.12.jar")))
+                      (add-after 'prepare-dependencies 'prepare-ideasdk-core-platform-api
+                        (lambda _
+                          ;; build.xml expects exact file names in dependencies directory
+                          (mkdir-p "ideaSDK/core")
+                          (symlink  (string-append
+                                          ,intellij-platform-api-kotlin-172
+                                          "/share/java/intellij-platform-api.jar")
+                            "ideaSDK/core/intellij-platform-api.jar")))
                       (add-after 'prepare-dependencies 'prepare-protobuf ; TODO: replace patched protobuf with this
                         (lambda _
                           ;; build.xml expects exact file names in dependencies directory
@@ -4129,6 +4206,18 @@ available.")
                                           "/share/java/protobuf.jar")
                             "dependencies/protobuf.jar")))
                       (delete 'remove-js-compiler-cli)
-                      (delete 'remove-targets)))))))))
+                      (delete 'remove-targets)
+                      (add-before 'check 'delete-hard-tests
+                        (lambda _
+                          (for-each
+                            delete-file
+                            (list
+                              ; DX tests require Android SDK
+                              "compiler/tests-common/org/jetbrains/kotlin/codegen/DxChecker.java"
+                              "compiler/tests/org/jetbrains/kotlin/codegen/TestStdlibWithDxTest.kt"
+
+                              "compiler/tests-common/org/jetbrains/kotlin/test/testFramework/mock/MockEditorEventMulticaster.java"
+                              "compiler/tests-common/org/jetbrains/kotlin/test/testFramework/mock/MockEditorFactory.java"))
+                          (delete-file-recursively "compiler/tests/org/jetbrains/kotlin/jvm/compiler/longTest")))))))))))
 
 kotlin-1.1.2-5

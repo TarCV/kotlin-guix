@@ -1,0 +1,26 @@
+--- a/platform/platform-api/src/com/intellij/execution/configurations/ParametersList.java
++++ b/platform/platform-api/src/com/intellij/execution/configurations/ParametersList.java
+@@ -17,7 +17,6 @@
+
+ import com.intellij.openapi.application.Application;
+ import com.intellij.openapi.application.ApplicationManager;
+-import com.intellij.openapi.application.PathMacros;
+ import com.intellij.openapi.diagnostic.Logger;
+ import com.intellij.openapi.util.text.StringUtil;
+ import com.intellij.util.ArrayUtil;
+@@ -296,15 +295,6 @@
+       // ApplicationManager.getApplication() will return null if executed in ParameterListTest
+       final Application application = ApplicationManager.getApplication();
+       if (application != null) {
+-        final PathMacros pathMacros = PathMacros.getInstance();
+-        if (pathMacros != null) {
+-          for (String name : pathMacros.getUserMacroNames()) {
+-            final String value = pathMacros.getValue(name);
+-            if (value != null) {
+-              myMacroMap.put("${" + name + "}", value);
+-            }
+-          }
+-        }
+         final Map<String, String> env = EnvironmentUtil.getEnvironmentMap();
+         for (String name : env.keySet()) {
+           final String key = "${" + name + "}";
