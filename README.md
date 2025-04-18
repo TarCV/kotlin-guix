@@ -10,7 +10,7 @@ Everything available in GUIX is assumed to be bootstrappable
 
 ## Status
 
-The build works up to Kotlin 1.0.0 (2016-02-12).
+The build works up to Kotlin 1.1.2-5 (2017-06-12).
 
 
 ## How to build
